@@ -27,7 +27,7 @@ DAG <- array(dim = c(q, q, C))
 Omega <- array(dim = c(q, q, C))
 for (i in 1:C) {    
     DAG[, , i] <- rDAG(q = q, w = 0.5)
-    L <- matrix(runif(n = q*(q-1), min = -10, max = 10), q, q)     ### va bene mettere questi min e max? 
+    L <- matrix(runif(n = q*(q-1), min = -5, max = 5), q, q)     ### va bene mettere questi min e max? 
     L <- L * DAG[, , i] 
     diag(L) <- 1
     D <- diag(1, q)
@@ -39,7 +39,7 @@ rmix <- function(w_real, Omega) {
     z_real <- sample(1:C, prob = w_real, size = N_SAMPLES, replace = TRUE)
     x <- matrix(, nrow = N_SAMPLES, ncol = q)
     for (i in 1:N_SAMPLES) {
-        x[i, ] <- mvtnorm::rmvnorm(1, sigma=Omega[, ,z_real[i]])
+        x[i, ] <- mvtnorm::rmvnorm(1, sigma=solve(Omega[, ,z_real[i]]))
     }
   
   return(list(x, z_real))
@@ -111,6 +111,8 @@ gibbs <- function(x, niter, C, alpha_0) {
   for (i in 1:N_SAMPLES) {
     z[i] <- sample(1:C, prob = w, size = 1)
   }
+  
+  N <- rep(0, C) # Samples per cluster
 
   # Save the Markov Chain 
   w_GS <- array(dim = c(C, niter) )
@@ -125,6 +127,7 @@ gibbs <- function(x, niter, C, alpha_0) {
   Omega_GS <- array(dim = c(q, q, C, niter))
   Omega_GS[, , , 1] <- Omega
 
+  
   cat("\nGibbs Sampling\n")
   cat(0, "/", niter, "\n")
   for (i in 1:niter) {
@@ -132,11 +135,16 @@ gibbs <- function(x, niter, C, alpha_0) {
       cat(i, "/", niter, "\n")
     }
 
-    N <- as.data.frame(table(z))$Freq
+    for (c in 1:C) {
+      N[c] <- sum(z == c)
+    }
+
+    
     
     w <- sample_w(alpha_0, N)
     z <- sample_z(mu, Omega, w, x)
-    #out <- update_DAGS(DAG, x, z, q, U=diag(1, q), w_dags)
+    print(w)
+    out <- update_DAGS(DAG, x, z, q, U=diag(1, q), w_dags)
     #DAG <- out$DAG
     #Omega <- out$Omega
 
@@ -149,7 +157,7 @@ gibbs <- function(x, niter, C, alpha_0) {
   return(list("w_GS" = w_GS, "z_GS" = z_GS, "DAG_GS" = DAG_GS, "Omega_GS" = Omega_GS))
 }
 
-mix <- gibbs(x, niter, C, alpha_0)
+mix <- gibbs(x, 100, C, alpha_0)
 
 # for ( i in 1:p ) {
 # 
@@ -159,3 +167,4 @@ mix <- gibbs(x, niter, C, alpha_0)
 # z_GS <- data.frame(mix[4])
 # x11()
 # plot(x, type="p", col=z_GS[, niter], pch=20)
+

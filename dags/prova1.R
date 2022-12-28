@@ -1,4 +1,16 @@
+library(gRbase)
+library(GLSME)
+library(BCDAG)
+library(gss)
+library(graph)
+library(Rcpp)
 
+setwd("C:/Users/andre/Documents/Università/Magistrale/2° Anno/1° Semestre/Bayesian statistics/Progetto/codes")
+source("dags/propose_DAG.R")
+source("dags/operation.R")
+source("dags/acceptreject_DAG.R")
+source("dags/new_bcdag.R")
+source("dags/update_DAG.R")
 
 #q <- 4
 #DAG <- matrix(c(0,1,1,0,0,0,0,1,0,0,0,1,0,0,0,0), nrow = q)

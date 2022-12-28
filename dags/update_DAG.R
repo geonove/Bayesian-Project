@@ -61,6 +61,7 @@ update_DAG <- function(DAG, data, a, U, w, fast = FALSE,
     L <- postparams$L
     D <- postparams$D
     Omega <- L%*%solve(D)%*%t(L)
+    Omega <- solve(Omega)
   }
 
 if (collapse == FALSE) {
@@ -88,6 +89,13 @@ update_DAGS <- function(DAG, data, z, a, U, w, fast = FALSE, collapse = FALSE, v
   Omega <- array(dim = c(q, q, C))
   for (c in 1:C) {
     clus_data <- data[z == c, ]
+    print(z)
+    if (sum(z == c) == 0) {
+      clus_data <- data[1, ]
+    }
+    
+    if (dim(clus_data)[1] == 0)
+      clus_data <- data[1, ]
     out <- update_DAG(DAG[, , c], clus_data, a, U, w, fast = FALSE, collapse = FALSE, verbose = TRUE)
     DAG[, , c] <- out$Graphs
     Omega[, , c] <- out$Omega
