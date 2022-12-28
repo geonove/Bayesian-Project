@@ -1,6 +1,6 @@
 update_DAG <- function(DAG, data, a, U, w, fast = FALSE, 
                        collapse = FALSE, verbose = TRUE) {
-
+  
   # "verbose" a cosa serve?
   input <- as.list(environment())
   data_check <- sum(is.na(data)) == 0
@@ -61,11 +61,10 @@ update_DAG <- function(DAG, data, a, U, w, fast = FALSE,
     L <- postparams$L
     D <- postparams$D
     Omega <- L%*%solve(D)%*%t(L)
-    sigma <- solve(Omega)
   }
 
 if (collapse == FALSE) {
-  out <- new_bcdag(list(Graphs = Graphs, L = L, D = D, sigma = sigma), 
+  out <- new_bcdag(list(Graphs = Graphs, L = L, D = D, Omega = Omega), 
                    input = input, type = type)
 }
 else {
@@ -76,10 +75,23 @@ return(out)
 }
 
 
-if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager")
-BiocManager::install("graph", version = "3.8")
+### if (!requireNamespace("BiocManager", quietly = TRUE))
+###     install.packages("BiocManager")
+### BiocManager::install("graph", version = "3.8")
+### 
+### install.packages("BiocManager")
+### BiocManager::install("Rgraphviz")
 
-install.packages("BiocManager")
-BiocManager::install("Rgraphviz")
 
+# Update DAGS
+update_DAGS <- function(DAG, data, z, a, U, w, fast = FALSE, collapse = FALSE, verbose = TRUE) {
+  Omega <- array(dim = c(q, q, C))
+  for (c in 1:C) {
+    clus_data <- data[z == c, ]
+    out <- update_DAG(DAG[, , c], clus_data, a, U, w, fast = FALSE, collapse = FALSE, verbose = TRUE)
+    DAG[, , c] <- out$Graphs
+    Omega[, , c] <- out$Omega
+  }
+  
+  return (list(DAG = DAG, Omega = Omega))
+}
