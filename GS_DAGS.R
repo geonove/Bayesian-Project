@@ -36,3 +36,5 @@ x <- data.frame(x)
 z_real <- unlist(z_real)
 x11()
 plot(x, type="p", col=z_real, pch=20)
+
+##MODIFICA ANDRES
