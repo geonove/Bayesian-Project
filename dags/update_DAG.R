@@ -1,11 +1,11 @@
 update_DAG <- function(DAG, data, a, U, w, fast = FALSE, 
                        collapse = FALSE, verbose = TRUE) {
   
-  # "verbose" a cosa serve?
+  
   input <- as.list(environment())
   data_check <- sum(is.na(data)) == 0
-  a_check <- is.numeric(a) & (length(a) == 1) & (a > ncol(data) - 
-                                                   1)
+  
+  a_check <- is.numeric(a) & (length(a) == 1) & (a > ncol(data) - 1)
   w_check <- is.numeric(w) & (length(w) == 1) & (w <= 1) & 
     (w >= 0)
   U_check <- is.numeric(U) & (dim(U)[1] == dim(U)[2]) & (prod(eigen(U)$values) > 
@@ -61,7 +61,6 @@ update_DAG <- function(DAG, data, a, U, w, fast = FALSE,
     L <- postparams$L
     D <- postparams$D
     Omega <- L%*%solve(D)%*%t(L)
-    Omega <- solve(Omega)
   }
 
 if (collapse == FALSE) {
@@ -85,18 +84,15 @@ return(out)
 
 
 # Update DAGS
-update_DAGS <- function(DAG, data, z, a, U, w, fast = FALSE, collapse = FALSE, verbose = TRUE) {
+update_DAGS <- function(DAG, data, z, a, U, w) {
   Omega <- array(dim = c(q, q, C))
   for (c in 1:C) {
     clus_data <- data[z == c, ]
-    print(z)
-    if (sum(z == c) == 0) {
-      clus_data <- data[1, ]
-    }
     
-    if (dim(clus_data)[1] == 0)
+    if (sum(z == c) == 0)
       clus_data <- data[1, ]
-    out <- update_DAG(DAG[, , c], clus_data, a, U, w, fast = FALSE, collapse = FALSE, verbose = TRUE)
+    
+    out <- update_DAG(DAG[, , c], clus_data, a, U, w, fast = TRUE, collapse = FALSE, verbose = TRUE)
     DAG[, , c] <- out$Graphs
     Omega[, , c] <- out$Omega
   }

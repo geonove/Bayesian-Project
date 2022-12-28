@@ -5,7 +5,7 @@ library(gss)
 library(graph)
 library(Rcpp)
 
-setwd("C:/Users/andre/Documents/UniversitÃ /Magistrale/2Â° Anno/1Â° Semestre/Bayesian statistics/Progetto/codes")
+setwd("C:/Users/andre/Documents/Università/Magistrale/2° Anno/1° Semestre/Bayesian statistics/Progetto/codes")
 source("dags/propose_DAG.R")
 source("dags/operation.R")
 source("dags/acceptreject_DAG.R")
@@ -13,7 +13,11 @@ source("dags/new_bcdag.R")
 source("dags/update_DAG.R")
 
 
+### Plot 3d
+#library(car)
 
+#scatter3d(x = x[, 1], y = x[, 2], z = x[, 3], point.col= z_real, surface = FALSE)
+#install.packages(c("rgl", "car"))
 
 # PARAMETERS
 C <- 4 # number of classes
@@ -27,7 +31,7 @@ DAG <- array(dim = c(q, q, C))
 Omega <- array(dim = c(q, q, C))
 for (i in 1:C) {    
     DAG[, , i] <- rDAG(q = q, w = 0.5)
-    L <- matrix(runif(n = q*(q-1), min = -5, max = 5), q, q)     ### va bene mettere questi min e max? 
+    L <- matrix(runif(n = q*(q-1), min = 0.1, max = 1), q, q)     ### va bene mettere questi min e max? 
     L <- L * DAG[, , i] 
     diag(L) <- 1
     D <- diag(1, q)
@@ -77,6 +81,7 @@ sample_z <- function(mu, Omega, w, x) {
     } else {
       prob <- runif(n = C, min = 0, max = 1)
     }
+
     z[i] <- sample(1:C, prob = prob, size = 1)
   }
   return(z)
@@ -105,7 +110,7 @@ gibbs <- function(x, niter, C, alpha_0) {
  
   # Initialize the Markov Chain
   w <- gtools::rdirichlet(1, alpha_0) * 0.01
-
+ 
   # Initialize cluster allocation
   z <- array(dim = N_SAMPLES)
   for (i in 1:N_SAMPLES) {
@@ -143,9 +148,8 @@ gibbs <- function(x, niter, C, alpha_0) {
     
     w <- sample_w(alpha_0, N)
     z <- sample_z(mu, Omega, w, x)
-    print(w)
-    out <- update_DAGS(DAG, x, z, q, U=diag(1, q), w_dags)
-    #DAG <- out$DAG
+    out <- update_DAGS(DAG = DAG, data = x, z = z, a = q, U=diag(1, q), w = w_dags)
+    DAG <- out$DAG
     #Omega <- out$Omega
 
     w_GS[, i] <- w
@@ -159,12 +163,12 @@ gibbs <- function(x, niter, C, alpha_0) {
 
 mix <- gibbs(x, 100, C, alpha_0)
 
-# for ( i in 1:p ) {
-# 
-#   x11()
-#   matplot(t(mu_GS[, i, ]), main="Markov Chain for mu", type = 'l', xlim = c(0, niter), lty = 1, lwd = 2)
-# }
-# z_GS <- data.frame(mix[4])
-# x11()
-# plot(x, type="p", col=z_GS[, niter], pch=20)
+
+
+x11()
+plot(x, type="p", col=mix$z_GS[, 100], pch=20)
+
+
+
+
 
