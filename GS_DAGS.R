@@ -7,8 +7,8 @@ library(Rcpp)
 library(rgl)
 library(car)
 
-#setwd("C:/Users/andre/Documents/UniversitÃ /Magistrale/2Â° Anno/1Â° Semestre/Bayesian statistics/Progetto/codes")
-setwd("/Users/andrespasinetti/Bayesian-Project-4")
+setwd("C:/Users/andre/Documents/Università/Magistrale/2° Anno/1° Semestre/Bayesian statistics/Progetto/codes")
+#setwd("/Users/andrespasinetti/Bayesian-Project-4")
 
 source("dags/propose_DAG.R")
 source("dags/operation.R")
@@ -20,18 +20,18 @@ source("dags/update_DAG.R")
 #install.packages(c("rgl", "car"))
 
 # PARAMETERS
-C <- 3 # number of classes
+C <- 4 # number of classes
 alpha_0 <- runif(n = C, min = 1, max = 4)
 q <- 3
 N_SAMPLES <- 700 # number of samples
-niter <- 20 # number of Gibbs Sampling iterations
+niter <- 200 # number of Gibbs Sampling iterations
 
 w_real <- gtools::rdirichlet(1, alpha_0)
 DAG_real <- array(dim = c(q, q, C))
 Omega_real <- array(dim = c(q, q, C))
 for (c in 1:C) {    
     DAG_real[, , c] <- rDAG(q = q, w = 0.5)
-    L <- matrix(runif(n = q*(q-1), min = -10, max = 10), q, q)     ### va bene mettere questi min e max? 
+    L <- matrix(runif(n = q*(q), min = -10, max = 10), q, q)     ### va bene mettere questi min e max? 
     L <- L * DAG_real[, , c] 
     diag(L) <- 1
     D <- diag(1, q)
@@ -108,7 +108,7 @@ gibbs <- function(x, niter, C, alpha_0) {
   Omega <- array(dim = c(q, q, C))
   for (c in 1:C) {    
     DAG[, , c] <- rDAG(q = q, w = w_dags)
-    L <- matrix(runif(n = q*(q-1), min = -10, max = 10), q, q)     ### va bene mettere questi min e max? 
+    L <- matrix(runif(n = q*(q), min = -10, max = 10), q, q)     ### va bene mettere questi min e max? 
     L <- L * DAG[, , c] 
     diag(L) <- 1
     D <- diag(1, q)
@@ -185,7 +185,7 @@ if (q==2) {
 
 cat("\nDAG_real:\n")
 print(DAG_real)
-cat("\nDAG_real:\n")
+cat("\nDAG_GS:\n")
 print(mix$DAG_GS[, , , niter])
 cat("\nOmega_real:\n")
 print(Omega_real)
