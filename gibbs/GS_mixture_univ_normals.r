@@ -153,8 +153,8 @@ gibbs <- function(x, niter, C, alpha_0, mu_0, tau_0, a_0, b_0) {
   cat("\nGibbs Sampling\n")
   cat(0, "/", niter, "\n")
   for (i in 1:niter) {
-    if (i %% 50 == 0) {
-      cat(i, "/", niter, "\n")
+    if (i %% 1 == 0) {
+      cat("\r", i, "/", niter)
     }
 
     N <- c()

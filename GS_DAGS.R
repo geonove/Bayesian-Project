@@ -20,7 +20,7 @@ source("dags/update_DAG.R")
 #install.packages(c("rgl", "car"))
 
 # PARAMETERS
-C <- 4 # number of classes
+C <- 3 # number of classes
 alpha_0 <- runif(n = C, min = 1, max = 4)
 q <- 3
 N_SAMPLES <- 700 # number of samples
