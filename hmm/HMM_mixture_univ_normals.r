@@ -4,30 +4,32 @@
 
 
 # PARAMETERS
-C <- 2 # number of possible hidden states
+C <- 3 # number of possible hidden states
 alpha_0 <- runif(n = C, min = 1, max = 4)
 mu_0 <- 0
 tau_0 <- 0.02 # precision
 a_0 <- 5
 b_0 <- 5
 
-LENGTH <- 1000 # length of the chain
-niter <- 200 # number of Gibbs Sampling iterations
+LENGTH <- 500 # length of the chain
+niter <- 100 # number of Gibbs Sampling iterations
 
 
 # Defining the unknown mixture
 mu_real <- rnorm(C, mu_0, sqrt(1 / tau_0))
 tau_real <- rgamma(C, shape = a_0, rate = b_0)
-cat("\nmu_real :", mu_real, "\n")
-cat("tau_real :", tau_real, "\n")
+cat("\nmu_real\n")
+print(mu_real)
+cat("\ntau_real\n")
+print(tau_real)
 
 # Transition probability matrix 
-# For finite mixture models, all rows are equal
+# (for finite mixture models all rows are equal)
 Q_real <- c()
 for (i in 1:C) {
   Q_real <- rbind(Q_real, gtools::rdirichlet(1, alpha_0))
 }
-cat("\nTransition matrix\n")
+cat("\nQ_real\n")
 print(Q_real)
 
 
@@ -144,7 +146,7 @@ sample_h <- function(d, Q, mu, tau) {
   }
 
   # Backward recursion
-  h[LENGTH] <- sample(1:C, prob = pi[LENGTH, ], size = 1)
+  h <- sample(1:C, prob = pi[LENGTH, ], size = 1)
   for (i in (LENGTH - 1):1) {
     # to avoid division by 0
     if (sum(P[, h[1], i + 1]) == 0) {
@@ -194,7 +196,9 @@ gibbs <- function(d, niter, alpha_0, mu_0, tau_0, a_0, b_0) {
     h <- sample_h(d, Q, mu, tau)
     mu_GS[i, ] <- mu
   }
+  cat("\nmu\n")
   print(mu)
+  cat("\nQ\n")
   print(Q)
   return(mu_GS)
 }
