@@ -1,7 +1,10 @@
 # This code is combining the following two papers
 # Bayesian Methods for Hidden Markov Models: Recursive Computing in the 21st Century - Author(s): Steven L. Scott
 # Gibbs Sampling for Bayesian Finite Mixtures of Normal Distributions - Cristina Mollica, Luca Tardella
-
+graphics.off()
+rm(list=ls())
+cat("\014")
+set.seed(42)
 
 # PARAMETERS
 C <- 3 # number of possible hidden states
@@ -12,8 +15,8 @@ a_0 <- 5
 b_0 <- 5
 
 LENGTH <- 500 # length of the chain
-niter <- 100 # number of Gibbs Sampling iterations
-
+niter <- 1000 # number of Gibbs Sampling iterations
+burnin <- 400
 
 # Defining the unknown mixture
 mu_real <- rnorm(C, mu_0, sqrt(1 / tau_0))
@@ -35,9 +38,10 @@ print(Q_real)
 
 # Generating an Hidden Markov Chain
 HMC <- function(Q) {
-  h <- c(1)
+  h <- numeric(LENGTH)
+  h[1] <- 1
   for (i in 2:LENGTH) {
-    h <- c(h, sample(1:C, prob = Q[h[length(h)], ], size = 1))
+    h[i] <- sample(1:C, prob = Q[h[i-1], ], size = 1)
   }
   return(h)
 }
@@ -82,28 +86,21 @@ sample_Q <- function(alpha_0, h) {
   for (i in 1:C) {
     Q[i, ] <- gtools::rdirichlet(1, alpha_0 + NN[i, ])
   }
-
   return(Q)
 }
 
-
 sample_tau <- function(mu, z, x, a_0, b_0, N) {
-  tau <- c()
+  tau <- numeric(C)
   for (c in 1:C) {
-    summation <- 0
-    for (i in 1:LENGTH) {
-      summation <- summation + z[i, c] * (x[i] - mu[c])^2
-    }
-    tau <- c(tau, rgamma(1, shape = a_0 + N[c] / 2, rate = b_0 + summation / 2))
+    summation <- z[, c] %*% (x - mu[c])^2
+    tau[c] <- rgamma(1, shape = a_0 + N[c] / 2, rate = b_0 + summation / 2)
   }
   return(tau)
 }
 
-
 sample_mu <- function(tau, z, x, tau_0, mu_0, N) {
-  mu <- c()
+  mu <- numeric(C)
   for (c in 1:C) {
-
     # to avoid division by 0
     if (N[c] == 0) {
       N[c] <- 1
@@ -111,7 +108,7 @@ sample_mu <- function(tau, z, x, tau_0, mu_0, N) {
 
     delta <- N[c] * tau[c] / (tau_0 + N[c] * tau[c])
     x_bar <- (z[, c] %*% x) / N[c]
-    mu <- c(mu, rnorm(1, delta * x_bar + (1 - delta) * mu_0, sqrt(1 / (tau_0 + N[c] * tau[c]))))
+    mu[c] <- rnorm(1, delta * x_bar + (1 - delta) * mu_0, sqrt(1 / (tau_0 + N[c] * tau[c])))
   }
   return(mu)
 }
@@ -162,13 +159,11 @@ sample_h <- function(d, Q, mu, tau) {
 
 # Gibbs Sampler
 gibbs <- function(d, niter, alpha_0, mu_0, tau_0, a_0, b_0) {
-  b_0 <- 50
-
   cat("\n\nGibbs Sampler\n")
   w <- gtools::rdirichlet(1, alpha_0)
-  Q <- c()
-  for (h in 1:C) {
-    Q <- rbind(Q, w)
+  Q <- matrix(nrow = C, ncol = C)
+  for (c in 1:C) {
+    Q[c, ] <- w
   }
   tau <- rgamma(C, shape = a_0, rate = b_0)
   mu <- rnorm(C, mu_0, sqrt(1 / tau_0))
@@ -207,3 +202,9 @@ mu_GS <- gibbs(d, niter, alpha_0, mu_0, tau_0, a_0, b_0)
 
 x11()
 matplot(mu_GS, main="Markov Chain for mu", type = 'l', xlim = c(0, niter), lty = 1, lwd = 2)
+
+mu_hat <- apply(mu_GS[burnin:niter, ], 2, mean)
+cat("mu_real: \n")
+print(mu_real)
+cat("mu_Gs: \n")
+print(mu_hat)
