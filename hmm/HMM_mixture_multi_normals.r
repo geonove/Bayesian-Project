@@ -14,7 +14,7 @@ a_0 <- 5
 b_0 <- diag(rep(0.5, p)) 
 
 LENGTH <- 1000 # length of the chain
-niter <- 200 # number of Gibbs Sampling iterations
+niter <- 5 # number of Gibbs Sampling iterations
 
 
 # Defining the unknown mixture
@@ -67,7 +67,7 @@ d <- rmix(w_real, mu_real, tau_real, h_real)
 
 d <- data.frame(d)
 h_real <- unlist(h_real)
-#x11()
+x11()
 plot(d, type="p", col=h_real, pch=20)
 
 
@@ -105,7 +105,7 @@ sample_mu <- function(tau, z, d, b_0, B_0, N) {
   mu <- matrix(, nrow = C, ncol = p)
   for (c in 1:C) {
     B_new <- solve(solve(B_0) + N[c] * tau[, , c])
-    # avoid divison by 0
+    #avoid divison by 0
     if (N[c] == 0) {
       N[c] <- 1
     }
@@ -126,7 +126,7 @@ sample_h <- function(d, Q, mu, tau) {
   for (t in 2:LENGTH) {
     for (r in 1:C) {
       for (s in 1:C) {
-        P[r, s, t] <- exp(log(pi[t - 1, r]) + log(Q[r, s]) + log(dmvnorm(d[t], mu[s,], sqrt(1 / tau[s,]))))   # dnorm -> dmvtnorm (libreria mvtfast)
+        P[r, s, t] <- exp(log(pi[t - 1, r]) + log(Q[r, s]) + log(dmvnorm(d[t, ], mu[s,], solve(tau[, , s]))))   # dnorm -> dmvtnorm (libreria mvtfast)
       }
     }
     summation <- sum(P[, , t])
@@ -198,22 +198,22 @@ gibbs <- function(d, niter, alpha_0, mu_0, tau_0, a_0, b_0) {
 
   cat(0, "/", niter, "\n")
   for (i in 1:niter) {
-    if (i %% 50 == 0) {
+    if (i %% 1 == 0) {
       cat(i, "/", niter, "\n")
     }
-    z <- matrix(0, nrow = LENGTH, ncol = C)
+    z_one_hot <- matrix(0, nrow = LENGTH, ncol = C)
     for (l in 1:LENGTH) {
-      z[l, h[l]] <- 1
+      z_one_hot[l, h[l]] <- 1
     }
     N <- c()
     for (c in 1:C) {
-      N <- c(N, sum(z[, c]))
+      N <- c(N, sum(z_one_hot[, c]))
     }
     Q <- sample_Q(alpha_0, h)
-    tau <- sample_tau(mu, z, d, a_0, b_0, N)
-    mu <- sample_mu(tau, z, d, tau_0, mu_0, N)
+    tau <- sample_tau(mu, h, d, c_0, C_0, N)
+    mu <- sample_mu(tau, h, d, b_0, B_0, N)
     h <- sample_h(d, Q, mu, tau)
-    mu_GS[i, ] <- mu
+    mu_GS[, , i] <- mu
   }
   print(mu)
   print(Q)
@@ -221,6 +221,6 @@ gibbs <- function(d, niter, alpha_0, mu_0, tau_0, a_0, b_0) {
 }
 
 mu_GS <- gibbs(d, niter, alpha_0, mu_0, tau_0, a_0, b_0)
-
-x11()
-matplot(mu_GS, main="Markov Chain for mu", type = 'l', xlim = c(0, niter), lty = 1, lwd = 2)
+###
+#x11()
+#matplot(mu_GS, main="Markov Chain for mu", type = 'l', xlim = c(0, niter), lty = 1, lwd = 2)
