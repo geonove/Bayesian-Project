@@ -146,13 +146,13 @@ sample_h <- function(d, Q, mu, tau) {
   }
 
   # Backward recursion
-  h <- sample(1:C, prob = pi[LENGTH, ], size = 1)
+  h[LENGTH] <- sample(1:C, prob = pi[LENGTH, ], size = 1)
   for (i in (LENGTH - 1):1) {
     # to avoid division by 0
-    if (sum(P[, h[1], i + 1]) == 0) {
+    if (sum(P[, h[i + 1], i + 1]) == 0) {
       prob <- rep(1 / C, C)
     } else {
-      prob <- P[, h[1], i + 1]
+      prob <- P[, h[i + 1], i + 1]
     }
     h[i] <- sample(1:C, prob = prob, size = 1)
   }

@@ -24,7 +24,7 @@ C <- 3 # number of classes
 alpha_0 <- runif(n = C, min = 1, max = 4)
 q <- 3
 N_SAMPLES <- 700 # number of samples
-niter <- 200 # number of Gibbs Sampling iterations
+niter <- 20 # number of Gibbs Sampling iterations
 
 w_real <- gtools::rdirichlet(1, alpha_0)
 DAG_real <- array(dim = c(q, q, C))
@@ -104,7 +104,7 @@ sample_z <- function(d, Q, mu, tau) {
   for (t in 2:N_SAMPLES) {
     for (r in 1:C) {
       for (s in 1:C) {
-        P[r, s, t] <- exp(log(pi[t - 1, r]) + log(Q[r, s]) + log(dmvnorm(d[t], mu[s,], sqrt(1 / tau[s,]))))   # dnorm -> dmvtnorm (libreria mvtfast)
+        P[r, s, t] <- exp(log(pi[t - 1, r]) + log(Q[r, s]) + log(dmvnorm(d[t, ], mu[s,], solve(tau[, , s]))))   # dnorm -> dmvtnorm (libreria mvtfast)
       }
     }
     summation <- sum(P[, , t])
@@ -123,17 +123,17 @@ sample_z <- function(d, Q, mu, tau) {
   }
   
   # Backward recursion
-  h[LENGTH] <- sample(1:C, prob = pi[LENGTH, ], size = 1)
-  for (i in (LENGTH - 1):1) {
+  z[N_SAMPLES] <- sample(1:C, prob = pi[N_SAMPLES, ], size = 1)
+  for (i in (N_SAMPLES - 1):1) {
     # to avoid division by 0
-    if (sum(P[, h[1], i + 1]) == 0) {
+    if (sum(P[, z[i + 1], i + 1]) == 0) {
       prob <- rep(1 / C, C)
     } else {
-      prob <- P[, h[1], i + 1]
+      prob <- P[, z[i + 1], i + 1]
     }
-    h[i] <- sample(1:C, prob = prob, size = 1)
+    z[i] <- sample(1:C, prob = prob, size = 1)
   }
-  return(h)
+  return(z)
 }
 
 
@@ -159,18 +159,18 @@ gibbs <- function(x, niter, C, alpha_0) {
   
   # Initialize the Markov Chain
   w <- gtools::rdirichlet(1, alpha_0) * 0.01
-  
-  # Initialize cluster allocation
-  z <- array(dim = N_SAMPLES)
-  for (i in 1:N_SAMPLES) {
-    z[i] <- sample(1:C, prob = w, size = 1)
+  Q <- c()
+  for (h in 1:C) {
+    Q <- rbind(Q, w)
   }
-  
+  # Initialize cluster allocation
+  z <- HMC(Q)
+
   N <- rep(0, C) # Samples per cluster
   
   # Save the Markov Chain 
-  w_GS <- array(dim = c(C, niter) )
-  w_GS[, 1] <- w
+  Q_GS <- array(dim = c(C, C, niter) )
+  Q_GS[, , 1] <- Q
   
   z_GS <- array(dim = c(N_SAMPLES , niter))
   z_GS[, 1] <- z
@@ -193,21 +193,19 @@ gibbs <- function(x, niter, C, alpha_0) {
       N[c] <- sum(z == c)
     }
     
-    
-    
-    w <- sample_w(alpha_0, N)
-    z <- sample_z(mu, Omega, w, x)
+    Q <- sample_Q(alpha_0, z)
+    z <- sample_z(x, Q, mu, Omega)
     out <- update_DAGS(DAG = DAG, data = x, z = z, a = q, U=diag(1, q), w = w_dags)
     DAG <- out$DAG
     Omega <- out$Omega
     
-    w_GS[, i] <- w
+    Q_GS[, , i] <- Q
     z_GS[, i] <- z
     DAG_GS[, , , i] <- DAG
     Omega_GS[, , , i] <- Omega
   }
   
-  return(list("w_GS" = w_GS, "z_GS" = z_GS, "DAG_GS" = DAG_GS, "Omega_GS" = Omega_GS))
+  return(list("Q_GS" = Q_GS, "z_GS" = z_GS, "DAG_GS" = DAG_GS, "Omega_GS" = Omega_GS))
 }
 
 mix <- gibbs(x, niter, C, alpha_0)
@@ -231,6 +229,14 @@ print(mix$DAG_GS[, , , niter])
 cat("\nOmega_real:\n")
 print(Omega_real)
 cat("\nOmega:\n")
-
-
 print(mix$Omega_GS[, , , niter])
+
+### TO DO ###
+# - aggiungere plot catene di markov
+# - sistemare grafici (nome assi e magari legenda)
+# - cambiare tutte le h in z
+# - sistemare tutto one_hot o no
+# - inizializzare a priori tutte le liste e gli array alla dimensione corretta
+# - variabili globali
+# - rigurdare/riordinare i codici in generale
+# - readme

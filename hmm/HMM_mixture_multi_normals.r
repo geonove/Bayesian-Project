@@ -5,7 +5,7 @@
 library("mvtnorm")
 
 # PARAMETERS
-C <- 4 # number of classes
+C <- 3 # number of classes
 alpha_0 <- runif(n = C, min = 1, max = 4)
 p <- 2
 mu_0 <- rep(0, p)
@@ -148,10 +148,10 @@ sample_h <- function(d, Q, mu, tau) {
   h[LENGTH] <- sample(1:C, prob = pi[LENGTH, ], size = 1)
   for (i in (LENGTH - 1):1) {
     # to avoid division by 0
-    if (sum(P[, h[1], i + 1]) == 0) {
+    if (sum(P[, h[i + 1], i + 1]) == 0) {
       prob <- rep(1 / C, C)
     } else {
-      prob <- P[, h[1], i + 1]
+      prob <- P[, h[i + 1], i + 1]
     }
     h[i] <- sample(1:C, prob = prob, size = 1)
   }
