@@ -77,14 +77,13 @@ x_seq <- seq(min(d) - 2*max(sqrt(1/tau_real)), max(d)+ 2*max(sqrt(1/tau_real)), 
 
 # Full conditionals
 sample_Q <- function(alpha_0, h) {
-  Q <- matrix(, nrow = C, ncol = C)
+  Q <- matrix(0, nrow = C, ncol = C)
   NN <- matrix(0, nrow = C, ncol = C)
   for (i in 2:LENGTH) {
     NN[h[i - 1], h[i]] <- NN[h[i - 1], h[i]] + 1
   }
-
-  for (i in 1:C) {
-    Q[i, ] <- gtools::rdirichlet(1, alpha_0 + NN[i, ])
+  for (c in 1:C) {
+    Q[c, ] <- gtools::rdirichlet(1, alpha_0 + NN[c, ])
   }
   return(Q)
 }
@@ -92,7 +91,7 @@ sample_Q <- function(alpha_0, h) {
 sample_tau <- function(mu, z, x, a_0, b_0, N) {
   tau <- numeric(C)
   for (c in 1:C) {
-    summation <- z[, c] %*% (x - mu[c])^2
+    summation <- (z == c) %*% (x - mu[c])^2
     tau[c] <- rgamma(1, shape = a_0 + N[c] / 2, rate = b_0 + summation / 2)
   }
   return(tau)
@@ -105,9 +104,8 @@ sample_mu <- function(tau, z, x, tau_0, mu_0, N) {
     if (N[c] == 0) {
       N[c] <- 1
     }
-
     delta <- N[c] * tau[c] / (tau_0 + N[c] * tau[c])
-    x_bar <- (z[, c] %*% x) / N[c]
+    x_bar <- ((z == c) %*% x) / N[c]
     mu[c] <- rnorm(1, delta * x_bar + (1 - delta) * mu_0, sqrt(1 / (tau_0 + N[c] * tau[c])))
   }
   return(mu)
@@ -174,20 +172,14 @@ gibbs <- function(d, niter, alpha_0, mu_0, tau_0, a_0, b_0) {
 
   cat(0, "/", niter, "\n")
   for (i in 1:niter) {
-    if (i %% 50 == 0) {
-      cat(i, "/", niter, "\n")
+    if (i %% 1 == 0) {
+      cat("\r", i, "/", niter)
     }
-    z <- matrix(0, nrow = LENGTH, ncol = C)
-    for (l in 1:LENGTH) {
-      z[l, h[l]] <- 1
-    }
-    N <- c()
-    for (c in 1:C) {
-      N <- c(N, sum(z[, c]))
-    }
+    
+    N <- tabulate(h)
     Q <- sample_Q(alpha_0, h)
-    tau <- sample_tau(mu, z, d, a_0, b_0, N)
-    mu <- sample_mu(tau, z, d, tau_0, mu_0, N)
+    tau <- sample_tau(mu, h, d, a_0, b_0, N)
+    mu <- sample_mu(tau, h, d, tau_0, mu_0, N)
     h <- sample_h(d, Q, mu, tau)
     mu_GS[i, ] <- mu
   }
