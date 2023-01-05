@@ -2,6 +2,7 @@
 # Gibbs Sampling for Bayesian Finite Mixtures of Normal Distributions - Cristina Mollica, Luca Tardella
 # https://web.uniroma1.it/memotef/sites/default/files/file%20lezioni/Lezione3_CMollica.pdf
 
+set.seed(42)
 
 # PARAMETERS
 C <- 4 # number of classes
@@ -87,15 +88,12 @@ sample_w <- function(alpha_0, N) {
 }
 
 sample_tau <- function(mu, z, x, a_0, b_0, N) {
-  tau <- c()
+  tau <- numeric(C)
   for (c in 1:C) {
-    summation <- 0
-    for (i in 1:N_SAMPLES) {
-      summation <- summation + z[i, c] * (x[i] - mu[c])^2
-    }
+    summation <- z[, c] %*% (x - mu[c])^2
     a_new <- a_0 + N[c] / 2
     b_new <- b_0 + summation / 2
-    tau <- c(tau, rgamma(1, shape = a_new, rate = b_new))
+    tau[c] <- rgamma(1, shape = a_new, rate = b_new)
   }
   return(tau)
 }
@@ -121,6 +119,7 @@ sample_z <- function(mu, tau, w, x) {
     for (c in 1:C) {
       summation <- summation + w[c] * dnorm(x[i], mu[c], sqrt(1 / tau[c]))
     }
+    print(summation)
     # avoid division by 0
     if (summation != 0) {
       for (c in 1:C) {
