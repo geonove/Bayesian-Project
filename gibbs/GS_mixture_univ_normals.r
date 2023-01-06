@@ -119,7 +119,7 @@ sample_z <- function(mu, tau, w, x) {
     for (c in 1:C) {
       summation <- summation + w[c] * dnorm(x[i], mu[c], sqrt(1 / tau[c]))
     }
-    print(summation)
+    
     # avoid division by 0
     if (summation != 0) {
       for (c in 1:C) {

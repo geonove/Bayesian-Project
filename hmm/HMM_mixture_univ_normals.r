@@ -16,7 +16,7 @@ b_0 <- 5
 
 LENGTH <- 500 # length of the chain
 niter <- 1000 # number of Gibbs Sampling iterations
-burnin <- 400
+burnin <- 200
 
 # Defining the unknown mixture
 mu_real <- rnorm(C, mu_0, sqrt(1 / tau_0))
@@ -120,24 +120,18 @@ sample_h <- function(d, Q, mu, tau) {
   pi <- matrix(0, nrow = LENGTH, ncol = C)
   pi[1, 1] <- 1
   for (t in 2:LENGTH) {
-    for (r in 1:C) {
-      for (s in 1:C) {
-        P[r, s, t] <- exp(log(pi[t - 1, r]) + log(Q[r, s]) + log(dnorm(d[t], mu[s], sqrt(1 / tau[s]))))   # dnorm -> dmvtnorm (libreria mvtfast)
-      }
-    }
+    P[, , t] <- exp(log(pi[t - 1, ]) + sweep(log(Q), 2, log(dnorm(d[t], mu, sqrt(1 / tau))), "+"))
     summation <- sum(P[, , t])
 
     # to reconcile proportionality
-     # to avoid division by 0
+    # to avoid division by 0
     if (summation == 0) {
       P[, , t] <- matrix(1 / C^2, nrow = C, ncol = C)
     } else {
       P[, , t] <- P[, , t] / summation
     }
 
-    for (s in 1:C) {
-      pi[t, s] <-  sum(P[, s, t])
-    }
+    pi[t, ] <-  colSums(P[, , t])
   }
 
   # Backward recursion
