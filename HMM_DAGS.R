@@ -18,13 +18,15 @@ source("dags/update_DAG.R")
 
 ### Plot 3d
 #install.packages(c("rgl", "car"))
+graphics.off()
+set.seed(55)
 
 # PARAMETERS
 C <- 3 # number of classes
-alpha_0 <- runif(n = C, min = 1, max = 4)
+alpha_0 <- runif(n = C, min = 1, max = 4) ## <- rep(1, C)
 q <- 3
 N_SAMPLES <- 700 # number of samples
-niter <- 20 # number of Gibbs Sampling iterations
+niter <- 100 # number of Gibbs Sampling iterations
 
 w_real <- gtools::rdirichlet(1, alpha_0)
 DAG_real <- array(dim = c(q, q, C))
@@ -70,13 +72,6 @@ x <- rmix(w_real, Omega_real, z_real)
 x <- data.frame(x)
 
 z_real <- unlist(z_real)
-if (q==2) {
-  x11()
-  plot(x, type="p", col=z_real, pch=20)
-} else if (q==3) {
-  open3d()
-  scatter3d(x = x[, 1], y = x[, 2], z = x[, 3], point.col= z_real, surface = FALSE)
-}
 
 
 # Full conditionals
@@ -158,13 +153,13 @@ gibbs <- function(x, niter, C, alpha_0) {
   
   
   # Initialize the Markov Chain
-  w <- gtools::rdirichlet(1, alpha_0) * 0.01
+  w <- gtools::rdirichlet(1, alpha_0) 
   Q <- c()
   for (h in 1:C) {
     Q <- rbind(Q, w)
   }
   # Initialize cluster allocation
-  z <- HMC(Q)
+  z <- HMC(Q) # Z | Q distr MC
 
   N <- rep(0, C) # Samples per cluster
   
@@ -207,10 +202,37 @@ gibbs <- function(x, niter, C, alpha_0) {
   
   return(list("Q_GS" = Q_GS, "z_GS" = z_GS, "DAG_GS" = DAG_GS, "Omega_GS" = Omega_GS))
 }
-
+# Running Gibbs
 mix <- gibbs(x, niter, C, alpha_0)
 
 
+
+# Masking z_real so that
+getmode <- function(v) {
+  uniqv <- unique(v)
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+mask <- matrix(, nrow = N_SAMPLES, ncol = C)
+for (c in 1:C) {
+  idx <- (z_real == c)
+  moda <- getmode(mix$z_GS[idx, niter])
+  mask[, moda] <- idx
+}
+
+for (c in 1:C) {
+  z_real[mask[, c]] <- c 
+}
+
+# Plot of true values
+if (q==2) {
+  x11()
+  plot(x, type="p", col=z_real, pch=20)
+} else if (q==3) {
+  open3d()
+  scatter3d(x = x[, 1], y = x[, 2], z = x[, 3], point.col= z_real, surface = FALSE)
+}
+# Plot of sampled values
 if (q==2) {
   x11()
   plot(x, type="p", col=mix$z_GS[, niter], pch=20)
@@ -218,7 +240,6 @@ if (q==2) {
   open3d()
   x <- data.frame(x)
   scatter3d(x = x[, 1], y = x[, 2], z = x[, 3], point.col= mix$z_GS[, niter], surface = FALSE)
-  
 }
 
 
@@ -231,6 +252,14 @@ print(Omega_real)
 cat("\nOmega:\n")
 print(mix$Omega_GS[, , , niter])
 
+### DOMANDE ###
+# - matrice DAG non-triangolare-bassa/ triangolare-alta, va bene? 
+# - range valori matrice L va bene? O deve per forza essere [0.1, 1] ? (vedi riga 34)
+# - per Q e z ha senso parlare di prior? O semplicemente stiamo inizializzando qualcosa. 
+#   (Probabilmente per Q ha senso ed è un vettore di Dirichlet)
+# - prior di Q: va bene fatta riga per riga o c'è una prior per Q intera
+# - plot della catena: come possiamo fare per la matrice della covarianza che ha q x q componenti?
+
 ### TO DO ###
 # - aggiungere plot catene di markov
 # - sistemare grafici (nome assi e magari legenda)
@@ -240,3 +269,17 @@ print(mix$Omega_GS[, , , niter])
 # - variabili globali
 # - rigurdare/riordinare i codici in generale
 # - readme
+
+x11()
+par(mfrow=c(4,1))
+matplot(mix$z_GS[100:160, 1], type='l', lty = 1, lwd = 2)
+matplot(mix$z_GS[100:160, niter/2], type='l', lty = 1, lwd = 2)
+matplot(mix$z_GS[100:160, niter], type='l', lty = 1, lwd = 2)
+matplot(z_real[100:160], type='l', lty = 1, lwd = 2)
+
+sum(z_real == mix$z_GS[, niter])
+
+# get_map (pacchetto BCDAG) -> maximum a posteriori DAG (dag modale)
+# get_mpm -> median probability model
+# calcolcare distanza (vi.dist o binder loss) tra cluster per ogni iterazione e plottarli
+# plot DAG: library "network", "pcalg"
