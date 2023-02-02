@@ -1,6 +1,6 @@
 # Implementing the following paper:
 # https://epub.jku.at/obvulihs/download/pdf/5554146?originalFilename=true
-
+set.seed(42)
 library("mvtnorm")
 # PARAMETERS
 C <- 4 # number of classes
@@ -13,7 +13,7 @@ b_0 <- diag(rep(0.5, p))
 
 
 N_SAMPLES <- 500 # number of samples
-niter <- 40 # number of Gibbs Sampling iterations
+niter <- 400 # number of Gibbs Sampling iterations
 
 
 # Defining the unknown mixture
@@ -62,7 +62,7 @@ sample_w <- function(alpha_0, N) {
 }
 
 sample_tau <- function(mu, z, x, c_0, C_0, N) {
-  tau <- array(, dim = c(p, p, C))
+  tau <- array(0, dim = c(p, p, C))
 
   for (c in 1:C) {
     summation <- t(sweep(x[z == c, ], p, mu[c, ], "-")) %*% (sweep(x[z == c, ], p, mu[c, ], "-"))
@@ -75,7 +75,7 @@ sample_tau <- function(mu, z, x, c_0, C_0, N) {
 
 
 sample_mu <- function(tau, z, x, b_0, B_0, N) {
-  mu <- matrix(, nrow = C, ncol = p)
+  mu <- matrix(0, nrow = C, ncol = p)
   for (c in 1:C) {
     B_new <- solve(solve(B_0) + N[c] * tau[, , c])
     # avoid divison by 0

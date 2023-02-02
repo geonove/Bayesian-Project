@@ -99,14 +99,14 @@ sample_tau <- function(mu, z, x, a_0, b_0, N) {
 }
 
 sample_mu <- function(tau, z, x, tau_0, mu_0, N) {
-  mu <- c()
+  mu <- numeric(C)
   for (c in 1:C) {
     if (N[c] == 0) {
       N[c] <- 1
     }
     delta <- N[c] * tau[c] / (tau_0 + N[c] * tau[c])
     x_bar <- (z[, c] %*% x) / N[c]
-    mu <- c(mu, rnorm(1, delta * x_bar + (1 - delta) * mu_0, sqrt(1 / (tau_0 + N[c] * tau[c]))))
+    mu[c] <- rnorm(1, delta * x_bar + (1 - delta) * mu_0, sqrt(1 / (tau_0 + N[c] * tau[c])))
   }
   return(mu)
 }
