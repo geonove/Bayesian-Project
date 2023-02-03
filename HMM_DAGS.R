@@ -26,7 +26,8 @@ C <- 3 # number of classes
 alpha_0 <- runif(n = C, min = 1, max = 4) ## <- rep(1, C)
 q <- 3
 N_SAMPLES <- 700 # number of samples
-niter <- 100 # number of Gibbs Sampling iterations
+burnin <- 60
+niter <- 200 # number of Gibbs Sampling iterations
 
 w_real <- gtools::rdirichlet(1, alpha_0)
 DAG_real <- array(dim = c(q, q, C))
@@ -283,3 +284,91 @@ sum(z_real == mix$z_GS[, niter])
 # get_mpm -> median probability model
 # calcolcare distanza (vi.dist o binder loss) tra cluster per ogni iterazione e plottarli
 # plot DAG: library "network", "pcalg"
+
+
+out <- new_bcdag(list(Graphs = mix$DAG_GS[, , 1, burnin:niter]), input = x, type = "collapsed")
+get_MAPdag(out)
+get_MPMdag(out)
+out <- new_bcdag(list(Graphs = mix$DAG_GS[, , 2, burnin:niter]), input = x, type = "collapsed")
+get_MAPdag(out)
+get_MPMdag(out)
+out <- new_bcdag(list(Graphs = mix$DAG_GS[, , 3, burnin:niter]), input = x, type = "collapsed")
+get_MAPdag(out)
+get_MPMdag(out)
+DAG_real
+
+n <- dim(mix$z_GS)[1]
+simil_mat <- matrix(0, nrow = n, ncol = n)
+for (t in (burnin + 1):niter){
+  
+  simil_mat = simil_mat + (matrix(mix$z_GS[,t], nrow = n, ncol = n) == t(matrix(mix$z_GS[,t], nrow = n, ncol = n)))*1
+  
+}
+
+simil_probs = simil_mat/(niter-burnin)
+
+############################################
+## Output (3) Posterior similarity matrix ##
+############################################
+
+
+
+par(mfrow = c(1,1))
+
+library(fields)
+colori = colorRampPalette(c('white','black'))
+par(mar = c(4,4,1,2), oma = c(0.5,0.5,0.5,0.5), cex = 1, mgp = c(2,0.5,0))
+image.plot(t(simil_probs), col = colori(100), zlim = c(0,1), cex.sub = 1, xlab = "i'", ylab = "i", axes = F,
+           horizontal = F, legend.shrink = 1, axis.args = list(cex.axis = 1), cex.lab = 1)
+
+axis(1, at = seq(1/n*10,1,by=1/n*10), lab = seq(10,n, by = 10), las = 1)
+axis(2, at = seq(1/n*10,1,by=1/n*10), lab = seq(10,n, by = 10), las = 1)
+
+
+#######################
+## Cluster estimates ##
+#######################
+
+library(mcclust)
+
+# Estimated clustering (i and i' in the same cluster iff simil.probs > 0.5)
+
+from_simil_to_clust = function(simil_probs){
+  
+  simil_mat = round(simil_probs)
+  
+  clust_ind = c()
+  
+  for(i in n:1){
+    
+    clust_ind[simil_mat[i,] == 1] = i
+    
+  }
+  
+  clust_ind = as.factor(clust_ind)
+  
+  levels(clust_ind) = 1:(length(levels(clust_ind)))
+  
+  return(clust_ind)
+  
+}
+
+z_estimated <- from_simil_to_clust(simil_probs)
+
+sum(z_estimated == z_real)
+sum(mix$z_GS[, ] == z_real)
+# Variation of Information (VI) between true and estimated clustering
+
+vi.dist(z_real, from_simil_to_clust(simil_probs))
+
+
+### SALSO
+
+library('salso')
+?salso
+
+dim(mix$z_GS)
+z_mcmc <- matrix(t(mix$z_GS[,burnin:niter]), nrow = niter-burnin+1, ncol = N_SAMPLES)
+
+z_binder <- salso(z_mcmc, "binder", maxNClusters = C)
+sum(z_binder == z_real)
