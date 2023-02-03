@@ -1,72 +1,9 @@
-setwd("C:/Users/andre/Documents/Università/Magistrale/2° Anno/1° Semestre/Bayesian statistics/Progetto/codes")
+#setwd("C:/Users/andre/Documents/Università/Magistrale/2° Anno/1° Semestre/Bayesian statistics/Progetto/codes")
+setwd("/Users/andrespasinetti/Bayesian-Project-6")
+
 library("readxl")
 library(corrplot)
-
-graphics.off()
-
-data<- read_excel("dataset.xlsx")
-data<- data.frame(data)
-#data[, 3:44] <- scale(data[, 3:44])
-head(data)
-
-for(i in 1:1110) {
-  for (j in 3:44)
-  data[i, j] <- (data[i+1, j] - data[i, j]) 
-}
-data <- data[1:1110, ]
-#data <- scale(data)
-
-# remove higly correlated features
-#M <- cor(data[, 3:44])
-#cols <- findCorrelation(M, cutoff = 0.7)
-#data <- data[, -cols]
-
-risk <- data[data$Y == 1, ]
-nonrisk <- data[data$Y == 0, ]
-
-M1<-cor(risk[, 3:44])
-head(round(M1,2))
-x11()
-corrplot(M1, method="circle")
-
-M2<-cor(nonrisk[, 3:44])
-head(round(M2,2))
-x11()
-corrplot(M2, method="circle")
-
-
-M <- abs(M1 - M2)
-head(round(M,2))
-x11()
-corrplot(M, method="circle")
-
-
-cols <- c()
-data3 <- data[, c(1,2, cols)]
-head(data3)
-
-summary(data3)
-
-for(i in 1:1110) {
-  data3[i, 3:5] <- (data3[i+1, 3:5] - data3[i, 3:5])
-}
-
-head(data3)
-summary(data3)
-cols <- colnames(data)[c(12, 14, 32)]
-df <- data[, c(7, 8, 9)]
-
-open3d()
-scatter3d(x = df[, 1], y = df[, 2], z = df[, 3], point.col= data3[1:1110, 1]+2, surface = FALSE)
-
-print(cols)
-
-x11()
-plot(df[, 1:2], type="p", col=data3[1:1110, 1]+2, pch=20)
-
-
-########################################################################
-
+library(caret)
 library(gRbase)
 library(GLSME)
 library(BCDAG)
@@ -75,7 +12,7 @@ library(graph)
 library(Rcpp)
 library(rgl)
 library(car)
-
+library('salso')
 
 source("dags/propose_DAG.R")
 source("dags/operation.R")
@@ -83,18 +20,76 @@ source("dags/acceptreject_DAG.R")
 source("dags/new_bcdag.R")
 source("dags/update_DAG.R")
 
-### Plot 3d
-#install.packages(c("rgl", "car"))
-graphics.off()
 set.seed(55)
+
+graphics.off()
+
+data<- read_excel("dataset.xlsx")
+data<- data.frame(data)
+head(data)
+
+for(i in 1:1110) {
+  for (j in 3:44)
+  data[i, j] <- (data[i+1, j] - data[i, j]) 
+}
+data <- data[1:1110, ]
+
+# remove higly correlated features
+#df <- cor(data[, 3:44])
+#x11()
+#corrplot(df, method="circle")
+#cols <- findCorrelation(df, cutoff = 0.9)
+#print(cols)
+#data <- data[, -(cols+2)]
+
+df <- cor(data[, 3:dim(data)[2]])
+x11()
+corrplot(df, method="circle")
+
+risk <- data[data$Y == 1, ]
+nonrisk <- data[data$Y == 0, ]
+
+M1<-cor(risk[, 3:dim(data)[2]])
+#x11()
+#corrplot(M1, method="circle")
+
+M2<-cor(nonrisk[, 3:dim(data)[2]])
+#x11()
+#corrplot(M2, method="circle")
+
+M <- abs(M1 - M2)
+x11()
+corrplot(M, method="circle")
+
+df <- data[3:dim(data)[2]]
+print(dim(df))
+#head(df)
+
+#indexes <- c()
+#for (i in 0:29) {
+#  id <- which(M == sort(M, FALSE)[43-i], arr.ind = TRUE)[1,]
+#  #print(id)
+#  indexes <- c(id[1], indexes)
+#  M <- M[-c(indexes[1]), -c(indexes[1])]
+#  df <- df[, -c(indexes[1])]
+#  #x11()
+#  #plot(data[, indexes], type="p", col=data[1:1110, 1]+2, pch=20)
+#
+#x11()
+#corrplot(M, method="circle")
+#dim(df)
+
+########################################################################
 
 # PARAMETERS
 C <- 2 # number of classes
-alpha_0 <- runif(n = C, min = 1, max = 4) ## <- rep(1, C)
-q <- 3
+alpha_0 <- rep(1, C) ## <- rep(1, C)
+q <- dim(df)[2]
 
-niter <- 100 # number of Gibbs Sampling iterations
+niter <- 50 # number of Gibbs Sampling iterations
 
+N_SAMPLES <- 1110
+x <- df[1:N_SAMPLES, ]
 
 # Generating an Hidden Markov Chain
 HMC <- function(Q) {
@@ -104,11 +99,6 @@ HMC <- function(Q) {
   }
   return(z)
 }
-
-
-
-N_SAMPLES <- 1110
-x <- df[1:N_SAMPLES, ]
 
 
 # Full conditionals
@@ -181,13 +171,12 @@ gibbs <- function(x, niter, C, alpha_0) {
   Omega <- array(dim = c(q, q, C))
   for (c in 1:C) {    
     DAG[, , c] <- rDAG(q = q, w = w_dags)
-    L <- matrix(runif(n = q*(q), min = -10, max = 10), q, q)     ### va bene mettere questi min e max? 
+    L <- matrix(runif(n = q*(q), min = 0, max = 1), q, q)     ### va bene mettere questi min e max? 
     L <- L * DAG[, , c] 
     diag(L) <- 1
     D <- diag(1, q)
     Omega[, , c] <- L%*%solve(D)%*%t(L)       
   }
-  
   
   # Initialize the Markov Chain
   w <- gtools::rdirichlet(1, alpha_0) 
@@ -217,7 +206,7 @@ gibbs <- function(x, niter, C, alpha_0) {
   cat("\nGibbs Sampling\n")
   cat(0, "/", niter, "\n")
   for (i in 1:niter) {
-    if (i %% 5 == 0) {
+    if (i %% 10 == 0) {
       cat(i, "/", niter, "\n")
     }
     
@@ -244,62 +233,9 @@ mix <- gibbs(x, niter, C, alpha_0)
 
 
 
-# Plot of true values
-if (q==2) {
-  x11()
-  plot(x, type="p", col=z_real, pch=20)
-} else if (q==3) {
-  open3d()
-  scatter3d(x = x[, 1], y = x[, 2], z = x[, 3], point.col= data3[1:N_SAMPLES, 1] + 2, surface = FALSE)
-}
-# Plot of sampled values
-if (q==2) {
-  x11()
-  plot(x, type="p", col=mix$z_GS[, niter], pch=20)
-} else if (q==3) {
-  open3d()
-  x <- data.frame(x)
-  scatter3d(x = x[, 1], y = x[, 2], z = x[, 3], point.col= mix$z_GS[, niter] + 1, surface = FALSE)
-}
+z_mcmc <- t(mix$z_GS[,20:niter]) 
+z_binder <- salso(z_mcmc, "binder", maxNClusters = C)
+z_binder <- z_binder - 1
 
+confusionMatrix(data=as.factor(z_binder), reference=as.factor(data[1:N_SAMPLES, 1]))
 
-cat("\nDAG_real:\n")
-print(DAG_real)
-cat("\nDAG_GS:\n")
-print(mix$DAG_GS[, , , niter])
-cat("\nOmega_real:\n")
-print(Omega_real)
-cat("\nOmega:\n")
-print(mix$Omega_GS[, , , niter])
-
-### DOMANDE ###
-# - matrice DAG non-triangolare-bassa/ triangolare-alta, va bene? 
-# - range valori matrice L va bene? O deve per forza essere [0.1, 1] ? (vedi riga 34)
-# - per Q e z ha senso parlare di prior? O semplicemente stiamo inizializzando qualcosa. 
-#   (Probabilmente per Q ha senso ed è un vettore di Dirichlet)
-# - prior di Q: va bene fatta riga per riga o c'è una prior per Q intera
-# - plot della catena: come possiamo fare per la matrice della covarianza che ha q x q componenti?
-
-### TO DO ###
-# - aggiungere plot catene di markov
-# - sistemare grafici (nome assi e magari legenda)
-# - cambiare tutte le h in z
-# - sistemare tutto one_hot o no
-# - inizializzare a priori tutte le liste e gli array alla dimensione corretta
-# - variabili globali
-# - rigurdare/riordinare i codici in generale
-# - readme
-
-x11()
-par(mfrow=c(4,1))
-matplot(mix$z_GS[100:160, 1], type='l', lty = 1, lwd = 2)
-matplot(mix$z_GS[100:160, niter/2], type='l', lty = 1, lwd = 2)
-matplot(mix$z_GS[100:160, niter], type='l', lty = 1, lwd = 2)
-matplot(z_real[100:160], type='l', lty = 1, lwd = 2)
-
-sum(z_real == mix$z_GS[, niter])
-
-# get_map (pacchetto BCDAG) -> maximum a posteriori DAG (dag modale)
-# get_mpm -> median probability model
-# calcolcare distanza (vi.dist o binder loss) tra cluster per ogni iterazione e plottarli
-# plot DAG: library "network", "pcalg"
