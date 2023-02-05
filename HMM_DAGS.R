@@ -7,6 +7,8 @@ library(Rcpp)
 library(rgl)
 library(car)
 
+rm(list=ls())
+graphics.off()
 setwd("C:/Users/andre/Documents/Università/Magistrale/2° Anno/1° Semestre/Bayesian statistics/Progetto/codes")
 #setwd("/Users/andrespasinetti/Bayesian-Project-4")
 
@@ -18,12 +20,12 @@ source("dags/update_DAG.R")
 
 ### Plot 3d
 #install.packages(c("rgl", "car"))
-graphics.off()
+
 set.seed(55)
 
 # PARAMETERS
 C <- 3 # number of classes
-alpha_0 <- runif(n = C, min = 1, max = 4) ## <- rep(1, C)
+alpha_0 <- rep(1, C)
 q <- 3
 N_SAMPLES <- 700 # number of samples
 burnin <- 60
@@ -38,7 +40,7 @@ for (c in 1:C) {
   L <- L * DAG_real[, , c] 
   diag(L) <- 1
   D <- diag(1, q)
-  Omega_real[, , c] <- L%*%solve(D)%*%t(L)       
+  Omega_real[, , c] <- solve(t(L))%*%(D)%*%solve(L)       
 }
 
 # Transition probability matrix 
@@ -64,7 +66,7 @@ z_real <- HMC(Q_real)
 rmix <- function(w_real, Omega_real, z_real) {
   x <- matrix(, nrow = N_SAMPLES, ncol = q)
   for (i in 1:N_SAMPLES) {
-    x[i, ] <- mvtnorm::rmvnorm(1, sigma=solve(Omega_real[, ,z_real[i]]))
+    x[i, ] <- mvtnorm::rmvnorm(1, sigma=(Omega_real[, ,z_real[i]]))
   }
   
   return (x)
@@ -100,7 +102,7 @@ sample_z <- function(d, Q, mu, tau) {
   for (t in 2:N_SAMPLES) {
     for (r in 1:C) {
       for (s in 1:C) {
-        P[r, s, t] <- exp(log(pi[t - 1, r]) + log(Q[r, s]) + log(dmvnorm(d[t, ], mu[s,], solve(tau[, , s]))))   # dnorm -> dmvtnorm (libreria mvtfast)
+        P[r, s, t] <- exp(log(pi[t - 1, r]) + log(Q[r, s]) + log(dmvnorm(d[t, ], mu[s,], (tau[, , s]))))   # dnorm -> dmvtnorm (libreria mvtfast)
       }
     }
     summation <- sum(P[, , t])
@@ -149,16 +151,14 @@ gibbs <- function(x, niter, C, alpha_0) {
     L <- L * DAG[, , c] 
     diag(L) <- 1
     D <- diag(1, q)
-    Omega[, , c] <- L%*%solve(D)%*%t(L)       
+    Omega[, , c] <- solve(t(L))%*%(D)%*%solve(L)       
   }
   
   
   # Initialize the Markov Chain
   w <- gtools::rdirichlet(1, alpha_0) 
-  Q <- c()
-  for (h in 1:C) {
-    Q <- rbind(Q, w)
-  }
+  Q <- t(matrix(w, nrow = C, ncol = length(w)))
+  
   # Initialize cluster allocation
   z <- HMC(Q) # Z | Q distr MC
 
@@ -214,12 +214,18 @@ getmode <- function(v) {
   uniqv[which.max(tabulate(match(v, uniqv)))]
 }
 
+library(hash)
+
+mappa <- array(, dim=c(C))
 mask <- matrix(, nrow = N_SAMPLES, ncol = C)
 for (c in 1:C) {
   idx <- (z_real == c)
   moda <- getmode(mix$z_GS[idx, niter])
+  mappa[c] <- moda
   mask[, moda] <- idx
 }
+
+
 
 for (c in 1:C) {
   z_real[mask[, c]] <- c 
@@ -273,10 +279,10 @@ print(mix$Omega_GS[, , , niter])
 
 x11()
 par(mfrow=c(4,1))
-matplot(mix$z_GS[100:160, 1], type='l', lty = 1, lwd = 2)
-matplot(mix$z_GS[100:160, niter/2], type='l', lty = 1, lwd = 2)
-matplot(mix$z_GS[100:160, niter], type='l', lty = 1, lwd = 2)
-matplot(z_real[100:160], type='l', lty = 1, lwd = 2)
+matplot(mix$z_GS[200:260, 1], type='l', lty = 1, lwd = 2)
+matplot(mix$z_GS[200:260, niter/2], type='l', lty = 1, lwd = 2)
+matplot(mix$z_GS[200:260, niter], type='l', lty = 1, lwd = 2)
+matplot(z_real[200:260], type='l', lty = 1, lwd = 2)
 
 sum(z_real == mix$z_GS[, niter])
 
@@ -289,13 +295,15 @@ sum(z_real == mix$z_GS[, niter])
 out <- new_bcdag(list(Graphs = mix$DAG_GS[, , 1, burnin:niter]), input = x, type = "collapsed")
 get_MAPdag(out)
 get_MPMdag(out)
+DAG_real[, , mappa[1]]
 out <- new_bcdag(list(Graphs = mix$DAG_GS[, , 2, burnin:niter]), input = x, type = "collapsed")
 get_MAPdag(out)
 get_MPMdag(out)
+DAG_real[, , mappa[2]]
 out <- new_bcdag(list(Graphs = mix$DAG_GS[, , 3, burnin:niter]), input = x, type = "collapsed")
 get_MAPdag(out)
 get_MPMdag(out)
-DAG_real
+DAG_real[, , mappa[3]]
 
 n <- dim(mix$z_GS)[1]
 simil_mat <- matrix(0, nrow = n, ncol = n)
@@ -307,12 +315,12 @@ for (t in (burnin + 1):niter){
 
 simil_probs = simil_mat/(niter-burnin)
 
-############################################
-## Output (3) Posterior similarity matrix ##
-############################################
+#################################
+## Posterior similarity matrix ##
+#################################
 
 
-
+x11()
 par(mfrow = c(1,1))
 
 library(fields)
@@ -356,7 +364,7 @@ from_simil_to_clust = function(simil_probs){
 z_estimated <- from_simil_to_clust(simil_probs)
 
 sum(z_estimated == z_real)
-sum(mix$z_GS[, ] == z_real)
+sum(mix$z_GS[, niter] == z_real)
 # Variation of Information (VI) between true and estimated clustering
 
 vi.dist(z_real, from_simil_to_clust(simil_probs))
@@ -372,3 +380,59 @@ z_mcmc <- matrix(t(mix$z_GS[,burnin:niter]), nrow = niter-burnin+1, ncol = N_SAM
 
 z_binder <- salso(z_mcmc, "binder", maxNClusters = C)
 sum(z_binder == z_real)
+
+
+###################################
+# estimated omega
+
+omega_hat <- array(0, dim = c(q, q, C))
+
+
+for (i in (burnin+1):niter) {
+  for (j in 1:C) {
+    omega_hat[, , j] <- omega_hat[, , j] + mix$Omega_GS[, , j, i]
+  }
+  
+}
+omega_hat <- omega_hat / (niter-burnin)
+omega_hat[, , 1]
+Omega_real[, , 1]
+
+library('SMFilter')
+FDist2(scale(omega_hat[, , 1]), scale(Omega_real[, , 3]))
+
+
+### label switching
+
+for (k in 1:q) {
+  var_hat11 <- matrix(, nrow = niter, ncol = C)
+
+  for (i in 1:niter) {
+    for (j in 1:C) {
+      var_hat11[i, j] <- mix$Omega_GS[k, 3, j, i]
+    }
+  }
+
+  var_real11 <- matrix(, nrow = 1, ncol = C)
+
+  for (i in 1:C) {
+    var_real11[i] <- Omega_real[k, 3, i]
+  }
+
+  x11()
+  matplot(var_hat11, main="Markov Chain for determinant(Omega)", type = 'l', xlim = c(0, niter), lty = 1, lwd = 2)
+  lines(1:niter, rep(var_real11[, 1], niter), col = mappa[1])
+  lines(1:niter, rep(var_real11[, 2], niter), col = mappa[2])
+  lines(1:niter, rep(var_real11[, 3], niter), col = mappa[3])
+}
+
+
+### convergence
+
+z_error <- array(, dim = niter)
+for (i in 1:(niter)) {
+  z_error[i] <- sum(z_real != mix$z_GS[, i])
+  }
+print(z_error)
+x11()
+matplot(z_error, type='l', lty = 1, lwd = 2)

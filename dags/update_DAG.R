@@ -59,7 +59,8 @@ update_DAG <- function(DAG, data, a, U, w, fast = FALSE,
                                 a + n, U + tXX)
     L <- postparams$L
     D <- postparams$D
-    Omega <- L%*%solve(D)%*%t(L)
+    #print(Graphs)
+    Omega <- solve(t(L))%*%(D)%*%solve(L)
   }
 
 if (collapse == FALSE) {
@@ -102,3 +103,4 @@ update_DAGS <- function(DAG, data, z, a, U, w) {
   
   return (list(DAG = DAG, Omega = Omega))
 }
+
