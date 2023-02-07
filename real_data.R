@@ -30,9 +30,10 @@ head(data)
 
 for(i in 1:1110) {
   for (j in 3:44)
-  data[i, j] <- (data[i+1, j] - data[i, j]) 
+  data[i, j] <- (data[i+1, j] - data[i, j])
 }
 data <- data[1:1110, ]
+
 
 # remove higly correlated features
 #df <- cor(data[, 3:44])
@@ -83,10 +84,10 @@ print(dim(df))
 
 # PARAMETERS
 C <- 2 # number of classes
-alpha_0 <- rep(1, C) ## <- rep(1, C)
+alpha_0 <- rep(1, C) 
 q <- dim(df)[2]
 
-niter <- 50 # number of Gibbs Sampling iterations
+niter <- 100 # number of Gibbs Sampling iterations
 
 N_SAMPLES <- 1110
 x <- df[1:N_SAMPLES, ]
@@ -126,7 +127,7 @@ sample_z <- function(d, Q, mu, tau) {
   for (t in 2:N_SAMPLES) {
     for (r in 1:C) {
       for (s in 1:C) {
-        P[r, s, t] <- exp(log(pi[t - 1, r]) + log(Q[r, s]) + log(dmvnorm(d[t, ], mu[s,], solve(tau[, , s]))))   # dnorm -> dmvtnorm (libreria mvtfast)
+        P[r, s, t] <- exp(log(pi[t - 1, r]) + log(Q[r, s]) + log(dmvnorm(d[t, ], mu[s,], (tau[, , s]))))  
       }
     }
     summation <- sum(P[, , t])
@@ -171,7 +172,7 @@ gibbs <- function(x, niter, C, alpha_0) {
   Omega <- array(dim = c(q, q, C))
   for (c in 1:C) {    
     DAG[, , c] <- rDAG(q = q, w = w_dags)
-    L <- matrix(runif(n = q*(q), min = 0, max = 1), q, q)     ### va bene mettere questi min e max? 
+    L <- matrix(runif(n = q*(q), min = 0, max = 1), q, q)    
     L <- L * DAG[, , c] 
     diag(L) <- 1
     D <- diag(1, q)
@@ -233,9 +234,22 @@ mix <- gibbs(x, niter, C, alpha_0)
 
 
 
-z_mcmc <- t(mix$z_GS[,20:niter]) 
+z_mcmc <- t(mix$z_GS[,10:niter])
 z_binder <- salso(z_mcmc, "binder", maxNClusters = C)
-z_binder <- z_binder - 1
+z_binder <- abs(z_binder - 2)
 
 confusionMatrix(data=as.factor(z_binder), reference=as.factor(data[1:N_SAMPLES, 1]))
 
+
+
+z_real <- data[1:N_SAMPLES, 1] +2
+
+
+### convergence
+z_error <- array(, dim = niter)
+for (i in 1:(niter)) {
+  z_error[i] <- sum(z_real != mix$z_GS[, i])
+  }
+print(z_error)
+x11()
+matplot(z_error, type='l', lty = 1, lwd = 2)
