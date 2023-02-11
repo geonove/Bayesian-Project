@@ -28,19 +28,19 @@ C <- 3 # number of classes
 alpha_0 <- rep(1, C)
 q <- 3
 N_SAMPLES <- 700 # number of samples
-burnin <- 60
-niter <- 200 # number of Gibbs Sampling iterations
+burnin <- 300
+niter <- 1000 # number of Gibbs Sampling iterations
 
 w_real <- gtools::rdirichlet(1, alpha_0)
 DAG_real <- array(dim = c(q, q, C))
-Omega_real <- array(dim = c(q, q, C))
+Sigma_real <- array(dim = c(q, q, C))
 for (c in 1:C) {    
   DAG_real[, , c] <- rDAG(q = q, w = 0.5)
   L <- matrix(runif(n = q*(q), min = -10, max = 10), q, q)     ### va bene mettere questi min e max? 
   L <- L * DAG_real[, , c] 
   diag(L) <- 1
   D <- diag(1, q)
-  Omega_real[, , c] <- solve(t(L))%*%(D)%*%solve(L)       
+  Sigma_real[, , c] <- solve(t(L))%*%(D)%*%solve(L)       
 }
 
 # Transition probability matrix 
@@ -66,12 +66,12 @@ z_real <- HMC(Q_real)
 rmix <- function(w_real, Omega_real, z_real) {
   x <- matrix(, nrow = N_SAMPLES, ncol = q)
   for (i in 1:N_SAMPLES) {
-    x[i, ] <- mvtnorm::rmvnorm(1, sigma=(Omega_real[, ,z_real[i]]))
+    x[i, ] <- mvtnorm::rmvnorm(1, sigma=(Sigma_real[, ,z_real[i]]))
   }
   
   return (x)
 }
-x <- rmix(w_real, Omega_real, z_real)
+x <- rmix(w_real, Sigma_real, z_real)
 x <- data.frame(x)
 
 z_real <- unlist(z_real)
@@ -79,12 +79,12 @@ z_real <- unlist(z_real)
 
 # Full conditionals
 sample_Q <- function(alpha_0, z) {
-  Q <- matrix(, nrow = C, ncol = C)
+  Q <- matrix(0, nrow = C, ncol = C)
   NN <- matrix(0, nrow = C, ncol = C)
   for (i in 2:N_SAMPLES) {
     NN[z[i - 1], z[i]] <- NN[z[i - 1], z[i]] + 1
   }
-  
+
   for (i in 1:C) {
     Q[i, ] <- gtools::rdirichlet(1, alpha_0 + NN[i, ])
   }
@@ -93,18 +93,19 @@ sample_Q <- function(alpha_0, z) {
 }
 
 # Forward-Backward 
-sample_z <- function(d, Q, mu, tau) {
+sample_z <- function(d, Q, mu, Sigma) {
   z <- numeric(N_SAMPLES)
   # Forward recursion
   P <- array(0, dim = c(C, C, N_SAMPLES))
   pi <- matrix(0, nrow = N_SAMPLES, ncol = C)
   pi[1, 1] <- 1
   for (t in 2:N_SAMPLES) {
-    for (r in 1:C) {
+    #for (r in 1:C) {
       for (s in 1:C) {
-        P[r, s, t] <- exp(log(pi[t - 1, r]) + log(Q[r, s]) + log(dmvnorm(d[t, ], mu[s,], (tau[, , s]))))   # dnorm -> dmvtnorm (libreria mvtfast)
+        P[, s, t] <- exp(log(pi[t - 1, ]) + log(Q[, s]) + log(dmvnorm(d[t, ], mu[s,], (Sigma[, , s]))))   # dnorm -> dmvtnorm (libreria mvtfast)
       }
-    }
+    #}
+    
     summation <- sum(P[, , t])
     
     # to reconcile proportionality
@@ -114,10 +115,11 @@ sample_z <- function(d, Q, mu, tau) {
     } else {
       P[, , t] <- P[, , t] / summation
     }
-    
+
     for (s in 1:C) {
       pi[t, s] <-  sum(P[, s, t])
     }
+    
   }
   
   # Backward recursion
@@ -144,14 +146,14 @@ gibbs <- function(x, niter, C, alpha_0) {
   
   # Initialize DAG
   DAG <- array(dim = c(q, q, C))
-  Omega <- array(dim = c(q, q, C))
+  Sigma <- array(dim = c(q, q, C))
   for (c in 1:C) {    
     DAG[, , c] <- rDAG(q = q, w = w_dags)
     L <- matrix(runif(n = q*(q), min = -10, max = 10), q, q)     ### va bene mettere questi min e max? 
     L <- L * DAG[, , c] 
     diag(L) <- 1
     D <- diag(1, q)
-    Omega[, , c] <- solve(t(L))%*%(D)%*%solve(L)       
+    Sigma[, , c] <- solve(t(L))%*%(D)%*%solve(L)       
   }
   
   
@@ -174,8 +176,8 @@ gibbs <- function(x, niter, C, alpha_0) {
   DAG_GS <- array(dim = c(q, q, C, niter))
   DAG_GS[, , , 1] <- DAG
   
-  Omega_GS <- array(dim = c(q, q, C, niter))
-  Omega_GS[, , , 1] <- Omega
+  Sigma_GS <- array(dim = c(q, q, C, niter))
+  Sigma_GS[, , , 1] <- Sigma
   
   
   cat("\nGibbs Sampling\n")
@@ -185,23 +187,23 @@ gibbs <- function(x, niter, C, alpha_0) {
       cat(i, "/", niter, "\n")
     }
     
-    for (c in 1:C) {
-      N[c] <- sum(z == c)
-    }
+    #for (c in 1:C) {
+    #  N[c] <- sum(z == c)
+    #}
     
     Q <- sample_Q(alpha_0, z)
-    z <- sample_z(x, Q, mu, Omega)
+    z <- sample_z(x, Q, mu, Sigma)
     out <- update_DAGS(DAG = DAG, data = x, z = z, a = q, U=diag(1, q), w = w_dags)
     DAG <- out$DAG
-    Omega <- out$Omega
+    Sigma <- out$Sigma
     
     Q_GS[, , i] <- Q
     z_GS[, i] <- z
     DAG_GS[, , , i] <- DAG
-    Omega_GS[, , , i] <- Omega
+    Sigma_GS[, , , i] <- Sigma
   }
   
-  return(list("Q_GS" = Q_GS, "z_GS" = z_GS, "DAG_GS" = DAG_GS, "Omega_GS" = Omega_GS))
+  return(list("Q_GS" = Q_GS, "z_GS" = z_GS, "DAG_GS" = DAG_GS, "Sigma_GS" = Sigma_GS))
 }
 # Running Gibbs
 mix <- gibbs(x, niter, C, alpha_0)
@@ -238,6 +240,7 @@ if (q==2) {
 } else if (q==3) {
   open3d()
   scatter3d(x = x[, 1], y = x[, 2], z = x[, 3], point.col= z_real, surface = FALSE)
+  title3d("True values")
 }
 # Plot of sampled values
 if (q==2) {
@@ -247,17 +250,19 @@ if (q==2) {
   open3d()
   x <- data.frame(x)
   scatter3d(x = x[, 1], y = x[, 2], z = x[, 3], point.col= mix$z_GS[, niter], surface = FALSE)
+  title3d("Sampled values")
 }
+
 
 
 cat("\nDAG_real:\n")
 print(DAG_real)
 cat("\nDAG_GS:\n")
 print(mix$DAG_GS[, , , niter])
-cat("\nOmega_real:\n")
-print(Omega_real)
-cat("\nOmega:\n")
-print(mix$Omega_GS[, , , niter])
+cat("\nSigma_real:\n")
+print(Sigma_real)
+cat("\nSigma:\n")
+print(mix$Sigma_GS[, , , niter])
 
 ### DOMANDE ###
 # - matrice DAG non-triangolare-bassa/ triangolare-alta, va bene? 
@@ -292,6 +297,7 @@ sum(z_real == mix$z_GS[, niter])
 # plot DAG: library "network", "pcalg"
 
 
+### Infernce about DAG struture
 out <- new_bcdag(list(Graphs = mix$DAG_GS[, , 1, burnin:niter]), input = x, type = "collapsed")
 get_MAPdag(out)
 get_MPMdag(out)
@@ -305,6 +311,10 @@ get_MAPdag(out)
 get_MPMdag(out)
 DAG_real[, , mappa[3]]
 
+
+#################################
+## Posterior similarity matrix ##
+#################################
 n <- dim(mix$z_GS)[1]
 simil_mat <- matrix(0, nrow = n, ncol = n)
 for (t in (burnin + 1):niter){
@@ -315,10 +325,6 @@ for (t in (burnin + 1):niter){
 
 simil_probs = simil_mat/(niter-burnin)
 
-#################################
-## Posterior similarity matrix ##
-#################################
-
 
 x11()
 par(mfrow = c(1,1))
@@ -328,7 +334,7 @@ colori = colorRampPalette(c('white','black'))
 par(mar = c(4,4,1,2), oma = c(0.5,0.5,0.5,0.5), cex = 1, mgp = c(2,0.5,0))
 image.plot(t(simil_probs), col = colori(100), zlim = c(0,1), cex.sub = 1, xlab = "i'", ylab = "i", axes = F,
            horizontal = F, legend.shrink = 1, axis.args = list(cex.axis = 1), cex.lab = 1)
-
+title("Similarity matrix")
 axis(1, at = seq(1/n*10,1,by=1/n*10), lab = seq(10,n, by = 10), las = 1)
 axis(2, at = seq(1/n*10,1,by=1/n*10), lab = seq(10,n, by = 10), las = 1)
 
@@ -342,23 +348,17 @@ library(mcclust)
 # Estimated clustering (i and i' in the same cluster iff simil.probs > 0.5)
 
 from_simil_to_clust = function(simil_probs){
-  
   simil_mat = round(simil_probs)
-  
   clust_ind = c()
-  
+
   for(i in n:1){
-    
     clust_ind[simil_mat[i,] == 1] = i
-    
   }
-  
+
   clust_ind = as.factor(clust_ind)
-  
   levels(clust_ind) = 1:(length(levels(clust_ind)))
   
   return(clust_ind)
-  
 }
 
 z_estimated <- from_simil_to_clust(simil_probs)
@@ -368,6 +368,15 @@ sum(mix$z_GS[, niter] == z_real)
 # Variation of Information (VI) between true and estimated clustering
 
 vi.dist(z_real, from_simil_to_clust(simil_probs))
+
+x11()
+par(mfrow=c(1,2))
+plot(density(z_real))
+title("true clusters density")
+plot(density(as.numeric(z_estimated)))
+title("estimated clusters density")
+
+
 
 
 ### SALSO
@@ -381,25 +390,33 @@ z_mcmc <- matrix(t(mix$z_GS[,burnin:niter]), nrow = niter-burnin+1, ncol = N_SAM
 z_binder <- salso(z_mcmc, "binder", maxNClusters = C)
 sum(z_binder == z_real)
 
+table(z_binder, z_real)
+psm <- salso::psm(z_mcmc, nCores = 4)
+x11()
+heatmap(psm)
+x11()
+par(mfrow=c(1,2))
+plot(density(z_real))
+plot(density(z_binder))
 
 ###################################
-# estimated omega
+# estimated Sigma
 
-omega_hat <- array(0, dim = c(q, q, C))
+Sigma_hat <- array(0, dim = c(q, q, C))
 
 
 for (i in (burnin+1):niter) {
   for (j in 1:C) {
-    omega_hat[, , j] <- omega_hat[, , j] + mix$Omega_GS[, , j, i]
+    Sigma_hat[, , j] <- Sigma_hat[, , j] + mix$Sigma_GS[, , j, i]
   }
   
 }
-omega_hat <- omega_hat / (niter-burnin)
-omega_hat[, , 1]
-Omega_real[, , 1]
+Sigma_hat <- Sigma_hat / (niter-burnin)
+Sigma_hat[, , 1]
+Sigma_real[, , 1]
 
 library('SMFilter')
-FDist2(scale(omega_hat[, , 1]), scale(Omega_real[, , 3]))
+FDist2(scale(Sigma_hat[, , 1]), scale(Sigma_real[, , 3]))
 
 
 ### label switching
@@ -409,14 +426,14 @@ for (k in 1:q) {
 
   for (i in 1:niter) {
     for (j in 1:C) {
-      var_hat11[i, j] <- mix$Omega_GS[k, 3, j, i]
+      var_hat11[i, j] <- mix$Sigma_GS[k, 3, j, i]
     }
   }
 
   var_real11 <- matrix(, nrow = 1, ncol = C)
 
   for (i in 1:C) {
-    var_real11[i] <- Omega_real[k, 3, i]
+    var_real11[i] <- Sigma_real[k, 3, i]
   }
 
   x11()
@@ -436,3 +453,41 @@ for (i in 1:(niter)) {
 print(z_error)
 x11()
 matplot(z_error, type='l', lty = 1, lwd = 2)
+
+
+##################
+
+for (i in 1:3) {
+  print(norm(Sigma_real[, , i]))
+}
+
+norms <- matrix(0, nrow = niter, ncol = C)
+for (i in 1:niter) {
+  for (j in 1:c) {
+    norms[i, j] <- norm(mix$Sigma_GS[, , j, i])
+  }
+}
+
+
+#######################
+open3d()
+#scatter3d(x = x[z_binder = z_real, 1], y = x[z_binder != z_real, 2], z = x[z_binder != z_real, 3], point.col= mix$z_GS[z_binder != z_real, niter], surface = FALSE)
+scatter3d(x = x[, 1], y = x[, 2], z = x[, 3], point.col= as.numeric(z_binder == z_real)+1, surface = FALSE)
+###############################
+
+x11()
+matplot(norms, main="Markov Chain for determinant(Omega)", type = 'l', xlim = c(0, niter), lty = 1, lwd = 2)
+lines(1:niter, rep(norm(Sigma_real[, , 1]), niter), col = mappa[1])
+lines(1:niter, rep(norm(Sigma_real[, , 2]), niter), col = mappa[2])
+lines(1:niter, rep(norm(Sigma_real[, , 3]), niter), col = mappa[3])
+
+x11()
+plot(x[,1], x[,2])
+mixtools::ellipse(c(0,0), Sigma_hat[1:2, 1:2, 1], col = 1)
+mixtools::ellipse(c(0,0), Sigma_hat[1:2, 1:2, 2], col = 2)
+mixtools::ellipse(c(0,0), Sigma_real[1:2, 1:2, 1], col = 3)
+mixtools::ellipse(c(0,0), Sigma_real[1:2, 1:2, 3], col = 4)
+
+
+saveRDS(mix, "output1000MCMC.RDS")
+mix <- readRDS()

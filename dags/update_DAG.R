@@ -60,11 +60,11 @@ update_DAG <- function(DAG, data, a, U, w, fast = FALSE,
     L <- postparams$L
     D <- postparams$D
     #print(Graphs)
-    Omega <- solve(t(L))%*%(D)%*%solve(L)
+    Sigma <- solve(t(L))%*%(D)%*%solve(L)
   }
 
 if (collapse == FALSE) {
-  out <- new_bcdag(list(Graphs = Graphs, L = L, D = D, Omega = Omega), 
+  out <- new_bcdag(list(Graphs = Graphs, L = L, D = D, Sigma = Sigma), 
                    input = input, type = type)
 }
 else {
@@ -85,7 +85,7 @@ return(out)
 
 # Update DAGS
 update_DAGS <- function(DAG, data, z, a, U, w) {
-  Omega <- array(dim = c(q, q, C))
+  Sigma <- array(dim = c(q, q, C))
 
   for (c in 1:C) {
     clus_data <- data[z == c, ]
@@ -98,9 +98,9 @@ update_DAGS <- function(DAG, data, z, a, U, w) {
 
     out <- update_DAG(DAG[, , c], clus_data, a, U, w, fast = TRUE, collapse = FALSE, verbose = TRUE)
     DAG[, , c] <- out$Graphs
-    Omega[, , c] <- out$Omega
+    Sigma[, , c] <- out$Sigma
   }
   
-  return (list(DAG = DAG, Omega = Omega))
+  return (list(DAG = DAG, Sigma = Sigma))
 }
 
