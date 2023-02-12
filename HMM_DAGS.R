@@ -142,14 +142,14 @@ gibbs <- function(x, niter, C, alpha_0) {
   x <- data.matrix(x)
   mu <- matrix(0, nrow = C, ncol = q)
   # Hyperparameters
-  w_dags <- 0.5 # probability of adjacency in dag
+  w_dags <- 0.2 # probability of adjacency in dag
   
   # Initialize DAG
   DAG <- array(dim = c(q, q, C))
   Sigma <- array(dim = c(q, q, C))
   for (c in 1:C) {    
     DAG[, , c] <- rDAG(q = q, w = w_dags)
-    L <- matrix(runif(n = q*(q), min = -10, max = 10), q, q)     ### va bene mettere questi min e max? 
+    L <- matrix(runif(n = q*(q), min = -1, max = 1), q, q)     ### va bene mettere questi min e max? 
     L <- L * DAG[, , c] 
     diag(L) <- 1
     D <- diag(1, q)
@@ -206,8 +206,9 @@ gibbs <- function(x, niter, C, alpha_0) {
   return(list("Q_GS" = Q_GS, "z_GS" = z_GS, "DAG_GS" = DAG_GS, "Sigma_GS" = Sigma_GS))
 }
 # Running Gibbs
-mix <- gibbs(x, niter, C, alpha_0)
-
+#mix <- gibbs(x, niter, C, alpha_0)
+#saveRDS(mix, "output1000MCMC.RDS")
+mix <- readRDS("output1000MCMC.RDS")
 
 
 # Masking z_real so that
@@ -229,6 +230,7 @@ for (c in 1:C) {
 
 
 
+
 for (c in 1:C) {
   z_real[mask[, c]] <- c 
 }
@@ -241,6 +243,7 @@ if (q==2) {
   open3d()
   scatter3d(x = x[, 1], y = x[, 2], z = x[, 3], point.col= z_real, surface = FALSE)
   title3d("True values")
+  rgl.snapshot('trueValues.png', fmt = 'png')
 }
 # Plot of sampled values
 if (q==2) {
@@ -344,6 +347,7 @@ axis(2, at = seq(1/n*10,1,by=1/n*10), lab = seq(10,n, by = 10), las = 1)
 #######################
 
 library(mcclust)
+library(caret)
 
 # Estimated clustering (i and i' in the same cluster iff simil.probs > 0.5)
 
@@ -371,12 +375,14 @@ vi.dist(z_real, from_simil_to_clust(simil_probs))
 
 x11()
 par(mfrow=c(1,2))
-plot(density(z_real))
-title("true clusters density")
-plot(density(as.numeric(z_estimated)))
-title("estimated clusters density")
+plot(density(z_real), main = "true clusters", xlab = "clusters", ylab = "density", xlim = c(0, 4))
+lines(1:length(table(z_real)), (table(as.numeric(z_real)))/N_SAMPLES, type = 'h', lwd=3, col = "blue")
+plot(density(as.numeric(z_estimated)), main = "estimated clusters",  xlab = "clusters", ylab = "density")
+lines(1:length(table(as.numeric(z_estimated))), (table(as.numeric(z_estimated)))/N_SAMPLES, type = 'h', lwd=3, col = "blue")
 
-
+z_estimated[as.numeric(z_estimated) > C] = C 
+z_estimated <- as.numeric(z_estimated)
+confusionMatrix(data = as.factor(z_estimated), reference = as.factor(z_real))
 
 
 ### SALSO
@@ -393,11 +399,17 @@ sum(z_binder == z_real)
 table(z_binder, z_real)
 psm <- salso::psm(z_mcmc, nCores = 4)
 x11()
-heatmap(psm)
+heatmap(psm, main = "posterior similarity matrix")
+
+
 x11()
 par(mfrow=c(1,2))
-plot(density(z_real))
-plot(density(z_binder))
+plot(density(z_real), main = "true clusters", xlab = "clusters", ylab = "density", xlim = c(0, 4))
+lines(1:length(table(z_real)), (table(as.numeric(z_real)))/N_SAMPLES, type = 'h', lwd=3, col = "blue")
+plot(density(as.numeric(z_binder)), main = "estimated clusters",  xlab = "clusters", ylab = "density", xlim = c(0, 4))
+lines(1:length(table(as.numeric(z_binder))), (table(as.numeric(z_binder)))/N_SAMPLES, type = 'h', lwd=3, col = "blue")
+
+confusionMatrix(data = as.factor(z_binder), reference = as.factor(z_real))
 
 ###################################
 # estimated Sigma
@@ -420,28 +432,33 @@ FDist2(scale(Sigma_hat[, , 1]), scale(Sigma_real[, , 3]))
 
 
 ### label switching
+x11()
+par(mfrow = c(2,2))
+for (k in 1:(q-1)) {
+  for (l in 1:(q-1)) {
+    var_hat <- matrix(, nrow = niter, ncol = C)
 
-for (k in 1:q) {
-  var_hat11 <- matrix(, nrow = niter, ncol = C)
-
-  for (i in 1:niter) {
-    for (j in 1:C) {
-      var_hat11[i, j] <- mix$Sigma_GS[k, 3, j, i]
+    for (i in 1:niter) {
+      for (j in 1:C) {
+        var_hat[i, j] <- mix$Sigma_GS[k, l, j, i]
+      }
     }
+
+    var_real <- matrix(, nrow = 1, ncol = C)
+
+    for (i in 1:C) {
+      var_real[i] <- Sigma_real[k, l, i]
+    }
+
+    
+    matplot(var_hat, main=paste("MC Sigma", k,l), type = 'l', xlim = c(0, niter), lty = 1, lwd = 1, 
+            ylab = paste("Sigma",k,l), xlab = "niter")
+    lines(1:niter, rep(var_real[, 1], niter), col = mappa[1])
+    lines(1:niter, rep(var_real[, 2], niter), col = mappa[2])
+    lines(1:niter, rep(var_real[, 3], niter), col = mappa[3])
   }
-
-  var_real11 <- matrix(, nrow = 1, ncol = C)
-
-  for (i in 1:C) {
-    var_real11[i] <- Sigma_real[k, 3, i]
-  }
-
-  x11()
-  matplot(var_hat11, main="Markov Chain for determinant(Omega)", type = 'l', xlim = c(0, niter), lty = 1, lwd = 2)
-  lines(1:niter, rep(var_real11[, 1], niter), col = mappa[1])
-  lines(1:niter, rep(var_real11[, 2], niter), col = mappa[2])
-  lines(1:niter, rep(var_real11[, 3], niter), col = mappa[3])
 }
+
 
 
 ### convergence
@@ -489,5 +506,9 @@ mixtools::ellipse(c(0,0), Sigma_real[1:2, 1:2, 1], col = 3)
 mixtools::ellipse(c(0,0), Sigma_real[1:2, 1:2, 3], col = 4)
 
 
-saveRDS(mix, "output1000MCMC.RDS")
-mix <- readRDS()
+
+#############################
+
+library('network')
+x11()
+plot(network(mix$DAG_GS[, , 1, 1]))

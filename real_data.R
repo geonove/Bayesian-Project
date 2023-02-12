@@ -1,5 +1,5 @@
-#setwd("C:/Users/andre/Documents/Università/Magistrale/2° Anno/1° Semestre/Bayesian statistics/Progetto/codes")
-setwd("/Users/andrespasinetti/Bayesian-Project-6")
+setwd("C:/Users/andre/Documents/Università/Magistrale/2° Anno/1° Semestre/Bayesian statistics/Progetto/codes")
+#setwd("/Users/andrespasinetti/Bayesian-Project-7")
 
 library("readxl")
 library(corrplot)
@@ -30,18 +30,13 @@ head(data)
 
 for(i in 1:1110) {
   for (j in 3:44)
-  data[i, j] <- (data[i+1, j] - data[i, j])
+  data[i, j] <- (data[i+1, j] - data[i, j]) / data[i, j]
 }
 data <- data[1:1110, ]
-
-
-# remove higly correlated features
-#df <- cor(data[, 3:44])
-#x11()
-#corrplot(df, method="circle")
-#cols <- findCorrelation(df, cutoff = 0.9)
-#print(cols)
-#data <- data[, -(cols+2)]
+data[3:dim(data)[2]] <- scale(data[3:dim(data)[2]])
+print(head(data))
+data <- data[, c(which( !is.na(data[1,]), arr.ind=TRUE)[,2])]
+print(head(data))
 
 df <- cor(data[, 3:dim(data)[2]])
 x11()
@@ -51,12 +46,12 @@ risk <- data[data$Y == 1, ]
 nonrisk <- data[data$Y == 0, ]
 
 M1<-cor(risk[, 3:dim(data)[2]])
-#x11()
-#corrplot(M1, method="circle")
+x11()
+corrplot(M1, method="circle")
 
 M2<-cor(nonrisk[, 3:dim(data)[2]])
-#x11()
-#corrplot(M2, method="circle")
+x11()
+corrplot(M2, method="circle")
 
 M <- abs(M1 - M2)
 x11()
@@ -64,21 +59,7 @@ corrplot(M, method="circle")
 
 df <- data[3:dim(data)[2]]
 print(dim(df))
-#head(df)
 
-#indexes <- c()
-#for (i in 0:29) {
-#  id <- which(M == sort(M, FALSE)[43-i], arr.ind = TRUE)[1,]
-#  #print(id)
-#  indexes <- c(id[1], indexes)
-#  M <- M[-c(indexes[1]), -c(indexes[1])]
-#  df <- df[, -c(indexes[1])]
-#  #x11()
-#  #plot(data[, indexes], type="p", col=data[1:1110, 1]+2, pch=20)
-#
-#x11()
-#corrplot(M, method="circle")
-#dim(df)
 
 ########################################################################
 
@@ -87,7 +68,8 @@ C <- 2 # number of classes
 alpha_0 <- rep(1, C) 
 q <- dim(df)[2]
 
-niter <- 100 # number of Gibbs Sampling iterations
+niter <- 2500 # number of Gibbs Sampling iterations
+burnin <- 300
 
 N_SAMPLES <- 1110
 x <- df[1:N_SAMPLES, ]
@@ -118,7 +100,7 @@ sample_Q <- function(alpha_0, z) {
 }
 
 # Forward-Backward 
-sample_z <- function(d, Q, mu, tau) {
+sample_z <- function(d, Q, mu, Sigma) {
   z <- numeric(N_SAMPLES)
   # Forward recursion
   P <- array(0, dim = c(C, C, N_SAMPLES))
@@ -127,7 +109,7 @@ sample_z <- function(d, Q, mu, tau) {
   for (t in 2:N_SAMPLES) {
     for (r in 1:C) {
       for (s in 1:C) {
-        P[r, s, t] <- exp(log(pi[t - 1, r]) + log(Q[r, s]) + log(dmvnorm(d[t, ], mu[s,], (tau[, , s]))))  
+        P[r, s, t] <- exp(log(pi[t - 1, r]) + log(Q[r, s]) + log(dmvnorm(d[t, ], mu[s,], (Sigma[, , s]))))  
       }
     }
     summation <- sum(P[, , t])
@@ -169,14 +151,14 @@ gibbs <- function(x, niter, C, alpha_0) {
   
   # Initialize DAG
   DAG <- array(dim = c(q, q, C))
-  Omega <- array(dim = c(q, q, C))
+  Sigma <- array(dim = c(q, q, C))
   for (c in 1:C) {    
     DAG[, , c] <- rDAG(q = q, w = w_dags)
     L <- matrix(runif(n = q*(q), min = 0, max = 1), q, q)    
     L <- L * DAG[, , c] 
     diag(L) <- 1
     D <- diag(1, q)
-    Omega[, , c] <- L%*%solve(D)%*%t(L)       
+    Sigma[, , c] <- solve(t(L))%*%solve(D)%*%solve(L)       
   }
   
   # Initialize the Markov Chain
@@ -200,8 +182,8 @@ gibbs <- function(x, niter, C, alpha_0) {
   DAG_GS <- array(dim = c(q, q, C, niter))
   DAG_GS[, , , 1] <- DAG
   
-  Omega_GS <- array(dim = c(q, q, C, niter))
-  Omega_GS[, , , 1] <- Omega
+  Sigma_GS <- array(dim = c(q, q, C, niter))
+  Sigma_GS[, , , 1] <- Sigma
   
   
   cat("\nGibbs Sampling\n")
@@ -216,33 +198,36 @@ gibbs <- function(x, niter, C, alpha_0) {
     }
     
     Q <- sample_Q(alpha_0, z)
-    z <- sample_z(x, Q, mu, Omega)
+    z <- sample_z(x, Q, mu, Sigma)
     out <- update_DAGS(DAG = DAG, data = x, z = z, a = q, U=diag(1, q), w = w_dags)
     DAG <- out$DAG
-    Omega <- out$Omega
+    Sigma <- out$Omega
     
     Q_GS[, , i] <- Q
     z_GS[, i] <- z
     DAG_GS[, , , i] <- DAG
-    Omega_GS[, , , i] <- Omega
+    Sigma_GS[, , , i] <- Sigma
   }
   
-  return(list("Q_GS" = Q_GS, "z_GS" = z_GS, "DAG_GS" = DAG_GS, "Omega_GS" = Omega_GS))
+  return(list("Q_GS" = Q_GS, "z_GS" = z_GS, "DAG_GS" = DAG_GS, "Sigma_GS" = Sigma_GS))
 }
 # Running Gibbs
-mix <- gibbs(x, niter, C, alpha_0)
+#mix <- gibbs(x, niter, C, alpha_0)
 
 
+#saveRDS(mix, file = "perc_diff_3000_noscale.rds")
 
-z_mcmc <- t(mix$z_GS[,10:niter])
+mix <- readRDS("diff_perc_10000.RDS")
+
+z_mcmc <- t(mix$z_GS[,burnin:niter])
 z_binder <- salso(z_mcmc, "binder", maxNClusters = C)
-z_binder <- abs(z_binder - 2)
+z_binder <- abs(z_binder -1)
 
 confusionMatrix(data=as.factor(z_binder), reference=as.factor(data[1:N_SAMPLES, 1]))
 
 
 
-z_real <- data[1:N_SAMPLES, 1] +2
+z_real <- abs(data[1:N_SAMPLES, 1]+1)
 
 
 ### convergence
@@ -250,6 +235,9 @@ z_error <- array(, dim = niter)
 for (i in 1:(niter)) {
   z_error[i] <- sum(z_real != mix$z_GS[, i])
   }
-print(z_error)
-x11()
-matplot(z_error, type='l', lty = 1, lwd = 2)
+
+
+png(filename="z_error.png", width = 4, height = 4, units = 'in',res=300)
+#x11()
+matplot(z_error, type='l', lty = 1, lwd = 2, xlab="iteration", ylab="# misclassified hidden states")
+dev.off()
