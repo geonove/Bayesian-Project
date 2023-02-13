@@ -358,8 +358,9 @@ from_simil_to_clust = function(simil_probs){
   for(i in n:1){
     clust_ind[simil_mat[i,] == 1] = i
   }
-
+  
   clust_ind = as.factor(clust_ind)
+  print(clust_ind)
   levels(clust_ind) = 1:(length(levels(clust_ind)))
   
   return(clust_ind)
@@ -450,12 +451,19 @@ for (k in 1:(q-1)) {
       var_real[i] <- Sigma_real[k, l, i]
     }
 
-    
+    if (k == 1 && l == 1) {
+      matplot(var_hat, main=paste("MC Sigma", k,l), type = 'l', xlim = c(0, niter), lty = 1, lwd = 1, 
+              ylab = paste("Sigma",k,l), xlab = "niter", ylim = c(0,150))
+    }
+    else {
     matplot(var_hat, main=paste("MC Sigma", k,l), type = 'l', xlim = c(0, niter), lty = 1, lwd = 1, 
             ylab = paste("Sigma",k,l), xlab = "niter")
+    }
     lines(1:niter, rep(var_real[, 1], niter), col = mappa[1])
     lines(1:niter, rep(var_real[, 2], niter), col = mappa[2])
     lines(1:niter, rep(var_real[, 3], niter), col = mappa[3])
+    legend("topright", legend=c("Cluster 1", "Cluster 2", "Cluster 3"),
+           col=c(mappa[1], mappa[2], mappa[3]), lty=1, cex=0.8)
   }
 }
 
@@ -499,12 +507,31 @@ lines(1:niter, rep(norm(Sigma_real[, , 2]), niter), col = mappa[2])
 lines(1:niter, rep(norm(Sigma_real[, , 3]), niter), col = mappa[3])
 
 x11()
-plot(x[,1], x[,2])
-mixtools::ellipse(c(0,0), Sigma_hat[1:2, 1:2, 1], col = 1)
-mixtools::ellipse(c(0,0), Sigma_hat[1:2, 1:2, 2], col = 2)
-mixtools::ellipse(c(0,0), Sigma_real[1:2, 1:2, 1], col = 3)
-mixtools::ellipse(c(0,0), Sigma_real[1:2, 1:2, 3], col = 4)
-
+plot(x[,1], x[,2], main="Covariance Matrix estimate, components 1 and 2", lwd = 1, pch = 1)
+mixtools::ellipse(c(0,0), Sigma_hat[1:2, 1:2, 1], col = 2, lwd = 3)
+mixtools::ellipse(c(0,0), Sigma_real[1:2, 1:2, mappa[1]], col = 1, lwd = 2, lty = 2)
+mixtools::ellipse(c(0,0), Sigma_hat[1:2, 1:2, 2], col = 3, lwd = 2)
+mixtools::ellipse(c(0,0), Sigma_real[1:2, 1:2, mappa[2]], col = 1, lwd = 2, lty = 3)
+mixtools::ellipse(c(0,0), Sigma_hat[1:2, 1:2, 3], col = 4, lwd = 2)
+mixtools::ellipse(c(0,0), Sigma_real[1:2, 1:2, mappa[3]], col = 1, lwd = 2, lty = 4)
+legend("topleft", 
+       legend = c("Sigma_hat, cluster 1", "Sigma_real, cluster 1", 
+                  "Sigma_hat, cluster 2", "Sigma_real, cluster 2",
+                  "Sigma_hat, cluster 3", "Sigma_real, cluster 3"),
+       col = c(2, 1, 3, 1, 4, 1), lty=c(1, 2, 1, 3, 1, 4), cex=0.5)
+x11()
+plot(x[,2], x[,3], main="Covariance Matrix estimate, components 2 and 3", lwd = 1, pch = 1)
+mixtools::ellipse(c(0,0), Sigma_hat[2:3, 2:3, 1], col = 2, lwd = 3)
+mixtools::ellipse(c(0,0), Sigma_real[2:3, 2:3, mappa[1]], col = 1, lwd = 2, lty = 2)
+mixtools::ellipse(c(0,0), Sigma_hat[2:3, 2:3, 2], col = 3, lwd = 2)
+mixtools::ellipse(c(0,0), Sigma_real[2:3, 2:3, mappa[2]], col = 1, lwd = 2, lty = 3)
+mixtools::ellipse(c(0,0), Sigma_hat[2:3, 2:3, 3], col = 4, lwd = 2)
+mixtools::ellipse(c(0,0), Sigma_real[2:3, 2:3, mappa[3]], col = 1, lwd = 2, lty = 4)
+legend("topleft", 
+       legend = c("Sigma_hat, cluster 1", "Sigma_real, cluster 1", 
+                  "Sigma_hat, cluster 2", "Sigma_real, cluster 2",
+                  "Sigma_hat, cluster 3", "Sigma_real, cluster 3"),
+       col = c(2, 1, 3, 1, 4, 1), lty=c(1, 2, 1, 3, 1, 4), cex=0.5)
 
 
 #############################
