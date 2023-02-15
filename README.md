@@ -1,6 +1,6 @@
 # Bayesian Inference for Dynamic Graphical Models
 
-This repository contains the following files to run a Dynamic Graphical Models (DGM) inference algorithm with Bayesian inference:
+This repository contains the following files:
 
 - `HMM_DAGS.R`, which contains the code necessary to run the final model on a simulated dataset
 - `real_data.R`, which contains the code necessary to run the final model on a real dataset
