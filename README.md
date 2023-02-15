@@ -1,5 +1,4 @@
 # Bayesian Inference for Dynamic Graphical Models
-### Tutors: Federico Castelletti and Francesco Denti (UniCatt)
 
 This repository contains the following files to run a Dynamic Graphical Models (DGM) inference algorithm with Bayesian inference:
 
