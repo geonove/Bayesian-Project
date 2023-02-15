@@ -1,4 +1,7 @@
-# bayesian-project
+# Bayesian inference for dynamic graphical models
+### Tutors: Federico Castelletti, Francesco Denti (UniCatt)
+
+The following is a description of the main files of this repository
 
 HMM_DAGS.R
 It contains the necessary code to run the final model on a simulated dataset
